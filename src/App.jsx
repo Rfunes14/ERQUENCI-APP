@@ -54,9 +54,8 @@ const MapaSeguimientoGps = ({ progreso, origenTexto, destinoTexto, patente, chof
   const mapInstanceRef = useRef(null);
   const markerMovilRef = useRef(null);
 
-  // Coordenadas base en San Rafael, Mendoza (Origen -> Policlínica San Rafael)
-  const origenCoords = [-34.6245, -68.3480]; // Zona Av. Balloffet
-  const destinoCoords = [-34.6148, -68.3265]; // Zona Av. Mitre / Centro Médico
+  const origenCoords = [-34.6245, -68.3480];
+  const destinoCoords = [-34.6148, -68.3265];
 
   const calcularPosicionActual = () => {
     if (coordsReales && coordsReales.lat && coordsReales.lng) {
@@ -84,7 +83,6 @@ const MapaSeguimientoGps = ({ progreso, origenTexto, destinoTexto, patente, chof
         attribution: '&copy; OpenStreetMap',
       }).addTo(map);
 
-      // Línea de ruta estimada
       L.polyline([origenCoords, destinoCoords], {
         color: '#1E588D',
         weight: 4,
@@ -92,7 +90,6 @@ const MapaSeguimientoGps = ({ progreso, origenTexto, destinoTexto, patente, chof
         dashArray: '8, 8',
       }).addTo(map);
 
-      // Marcador Origen (Domicilio)
       const iconOrigen = L.divIcon({
         className: 'custom-pin',
         html: `<div style="background:#34B37B;color:white;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:12px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);">P</div>`,
@@ -103,7 +100,6 @@ const MapaSeguimientoGps = ({ progreso, origenTexto, destinoTexto, patente, chof
         .addTo(map)
         .bindPopup(`<b>Retiro Paciente:</b><br/>${origenTexto}`);
 
-      // Marcador Destino (Centro Médico)
       const iconDestino = L.divIcon({
         className: 'custom-pin',
         html: `<div style="background:#1E588D;color:white;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:14px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);">+</div>`,
@@ -114,7 +110,6 @@ const MapaSeguimientoGps = ({ progreso, origenTexto, destinoTexto, patente, chof
         .addTo(map)
         .bindPopup(`<b>Centro Médico:</b><br/>${destinoTexto}`);
 
-      // Marcador Móvil en Tiempo Real
       const iconMovil = L.divIcon({
         className: 'custom-car',
         html: `<div style="background:#0f172a;color:#34B37B;padding:4px 8px;border-radius:999px;font-weight:800;font-size:11px;border:2px solid #34B37B;white-space:nowrap;box-shadow:0 4px 10px rgba(0,0,0,0.35);">🚕 ${patente || 'MÓVIL'}</div>`,
@@ -136,7 +131,6 @@ const MapaSeguimientoGps = ({ progreso, origenTexto, destinoTexto, patente, chof
     };
   }, []);
 
-  // Actualizar posición del móvil cada vez que avanza el GPS
   useEffect(() => {
     if (mapInstanceRef.current && markerMovilRef.current) {
       const nuevaPos = calcularPosicionActual();
@@ -258,9 +252,7 @@ const evaluarVencimiento = (fechaStr) => {
   if (diffDias < 0) return { estado: 'VENCIDO', dias: diffDias, badge: 'bg-red-100 text-red-700 border-red-300', bloqueado: true };
   if (diffDias <= 30) return { estado: 'POR VENCER', dias: diffDias, badge: 'bg-amber-100 text-amber-800 border-amber-300', bloqueado: false };
   return { estado: 'VIGENTE', dias: diffDias, badge: 'bg-emerald-100 text-emerald-700 border-emerald-300', bloqueado: false };
-};
-
-// ============================================================================
+};// ============================================================================
 // APLICACIÓN PRINCIPAL ERQUENCI ART SAAS
 // ============================================================================
 export default function App() {
@@ -274,7 +266,6 @@ export default function App() {
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
 
-  // Lista dinámica de Centros Médicos
   const [centrosMedicos, setCentrosMedicos] = useState([
     { id: 'cm-1', nombre: 'Policlínica San Rafael', direccion: 'Av. Mitre 650' },
     { id: 'cm-2', nombre: 'Hospital Teodoro J. Schestakow', direccion: 'Emilio Civit 150' },
@@ -283,13 +274,11 @@ export default function App() {
   const [mostrarFormCentro, setMostrarFormCentro] = useState(false);
   const [nuevoCentro, setNuevoCentro] = useState({ nombre: '', direccion: '' });
 
-  // Prestadores
   const [prestadores, setPrestadores] = useState([
     { id: '22222222-2222-2222-2222-222222222221', razon_social: 'Erquenci Flota San Rafael S.A.S.', cuit: '30-71999111-4', zona_cobertura: 'San Rafael, Mendoza', telefono_guardia: '2604551122', habilitado_operar: true },
     { id: '22222222-2222-2222-2222-222222222222', razon_social: 'Traslados Médicos Valle del Atuel', cuit: '30-71888222-7', zona_cobertura: 'San Rafael / Malargüe', telefono_guardia: '2604663344', habilitado_operar: true },
   ]);
 
-  // Vehículos y Choferes
   const [vehiculos, setVehiculos] = useState([
     {
       id: '33333333-3333-3333-3333-333333333331',
@@ -380,7 +369,6 @@ export default function App() {
   const [textoFalla, setTextoFalla] = useState('');
   const [gpsRealActivo, setGpsRealActivo] = useState(false);
 
-  // Formularios de alta
   const [nuevoViaje, setNuevoViaje] = useState({
     paciente_nombre: '',
     paciente_dni: '',
@@ -408,7 +396,6 @@ export default function App() {
     matafuegos_venc: '2027-06-01',
   });
 
-  // Escuchar sesión real de Supabase
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
@@ -423,7 +410,6 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Simulación de avance GPS cuando no está activado el GPS físico del navegador
   useEffect(() => {
     if (gpsRealActivo) return;
     const interval = setInterval(() => {
@@ -442,7 +428,6 @@ export default function App() {
     return () => clearInterval(interval);
   }, [gpsRealActivo]);
 
-  // Rastreo GPS físico real desde dispositivo móvil del chofer
   const activarGpsRealDispositivo = () => {
     if (!navigator.geolocation) {
       alert('Tu navegador o dispositivo no soporta geolocalización GPS.');
@@ -468,7 +453,6 @@ export default function App() {
     );
   };
 
-  // Procesar archivo de imagen de chofer (Base64 / Preview inmediato + Storage listo)
   const manejarSubidaFotoChofer = (file, callbackUrl) => {
     if (!file) return;
     const reader = new FileReader();
@@ -478,7 +462,6 @@ export default function App() {
     reader.readAsDataURL(file);
   };
 
-  // Agregar nuevo centro médico desde pestaña Derivar Traslado
   const guardarNuevoCentroMedico = () => {
     if (!nuevoCentro.nombre.trim()) return;
     const etiquetaCompleta = nuevoCentro.direccion.trim()
@@ -640,9 +623,6 @@ export default function App() {
     alert(`Link seguro del paciente copiado para enviar por WhatsApp:\n${url}`);
   };
 
-  // ==========================================================================
-  // PANTALLA DE LOGIN REAL
-  // ==========================================================================
   if (!modoDemo && !session && !pacienteTokenUrl) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 via-teal-50/40 to-blue-100/50 p-4">
@@ -691,7 +671,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* BARRA SUPERIOR CORPORATIVA */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
           <ErquenciLogo
@@ -748,12 +727,8 @@ export default function App() {
         </div>
       </header>
 
-      {/* ==================================================================== */}
-      {/* VISTA 1: TORRE DE CONTROL ART (MULTI-PRESTADOR + AUDITORÍA FLOTA)    */}
-      {/* ==================================================================== */}
       {rolActivo === 'CENTRAL_ART' && (
         <main className="max-w-7xl w-full mx-auto px-4 py-6 space-y-6">
-          {/* ALERTA GLOBAL DE DESPERFECTO MECÁNICO EN RUTA */}
           {traslados.some((t) => t.estado === 'ALERTA_DESPERFECTO') && (
             <div className="bg-red-50 border-2 border-red-500 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-md animate-pulse">
               <div className="flex items-center gap-3">
@@ -789,7 +764,6 @@ export default function App() {
             </div>
           )}
 
-          {/* SUB-NAVEGACIÓN TORRE DE CONTROL */}
           <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
             <button
               onClick={() => setTabAdmin('TORRE')}
@@ -825,7 +799,6 @@ export default function App() {
             </button>
           </div>
 
-          {/* PESTAÑA 1: MONITOREO EN VIVO */}
           {tabAdmin === 'TORRE' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 space-y-4">
@@ -918,7 +891,6 @@ export default function App() {
                 })}
               </div>
 
-              {/* AUDITORÍA DEL VIAJE SELECCIONADO */}
               <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4 h-fit">
                 <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
                   <FileText className="w-4 h-4 text-[#1E588D]" /> Auditoría y Trazabilidad ART
@@ -950,7 +922,6 @@ export default function App() {
             </div>
           )}
 
-          {/* PESTAÑA 2: DERIVAR NUEVO TRASLADO + ALTA DE NUEVOS CENTROS MÉDICOS */}
           {tabAdmin === 'NUEVO_VIAJE' && (
             <form onSubmit={crearNuevoTraslado} className="bg-white rounded-2xl border border-slate-200 p-6 max-w-2xl space-y-4">
               <h3 className="font-bold text-base text-slate-900">Emitir Orden de Traslado ART</h3>
@@ -976,7 +947,6 @@ export default function App() {
                   <input required value={nuevoViaje.origen_direccion} onChange={(e) => setNuevoViaje({ ...nuevoViaje, origen_direccion: e.target.value })} className="w-full border rounded-xl px-3 py-2 text-sm" placeholder="Calle, altura y barrio" />
                 </div>
 
-                {/* SELECTOR DE CENTRO MÉDICO + BOTÓN AGREGAR NUEVO */}
                 <div className="sm:col-span-2 space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="block text-xs font-semibold text-slate-600">Centro Médico de Destino</label>
@@ -1066,7 +1036,6 @@ export default function App() {
             </form>
           )}
 
-          {/* PESTAÑA 3: FLOTA, FOTOS DE CHOFERES Y VENCIMIENTOS LEGALES */}
           {tabAdmin === 'FLOTA' && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1087,7 +1056,6 @@ export default function App() {
                         <p className="text-xs text-slate-500">{prest?.razon_social}</p>
                       </div>
 
-                      {/* Foto editable del chofer */}
                       <div className="flex items-center justify-between gap-2.5 pt-2 border-t border-slate-100">
                         <div className="flex items-center gap-2.5">
                           <img
@@ -1144,7 +1112,6 @@ export default function App() {
                 })}
               </div>
 
-              {/* Alta rápida de móvil + foto de chofer + vencimientos */}
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -1182,7 +1149,6 @@ export default function App() {
                   <input required placeholder="Modelo vehículo" value={nuevoVehiculo.modelo} onChange={(e) => setNuevoVehiculo({ ...nuevoVehiculo, modelo: e.target.value })} className="border rounded-xl px-3 py-2" />
                   <input required placeholder="Nombre del Chofer" value={nuevoVehiculo.chofer_nombre} onChange={(e) => setNuevoVehiculo({ ...nuevoVehiculo, chofer_nombre: e.target.value })} className="border rounded-xl px-3 py-2" />
 
-                  {/* Carga de Foto del Chofer */}
                   <div className="sm:col-span-2 flex items-center gap-3 border rounded-xl px-3 py-1.5 bg-slate-50">
                     {nuevoVehiculo.chofer_foto ? (
                       <img src={nuevoVehiculo.chofer_foto} alt="Vista previa" className="w-8 h-8 rounded-full object-cover border" />
@@ -1236,7 +1202,6 @@ export default function App() {
             </div>
           )}
 
-          {/* PESTAÑA 4: PRESTADORES HOMOLOGADOS */}
           {tabAdmin === 'PRESTADORES' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-3">
@@ -1273,12 +1238,8 @@ export default function App() {
         </main>
       )}
 
-      {/* ==================================================================== */}
-      {/* VISTA 2: TERMINAL MÓVIL DEL CHOFER                                   */}
-      {/* ==================================================================== */}
       {rolActivo === 'CHOFER' && viajeActivo && (
         <main className="max-w-xl w-full mx-auto px-4 py-6 space-y-5">
-          {/* Credencial Chofer */}
           <div className="bg-white rounded-2xl border border-slate-200 p-4 flex items-center justify-between gap-2">
             <div className="flex items-center gap-3">
               <img src={vehiculoAsignado?.chofer_foto} alt="Chofer" className="w-12 h-12 rounded-full object-cover border-2 border-[#34B37B]" />
@@ -1306,7 +1267,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Tarjeta del Paciente Asignado */}
           <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4 shadow-sm">
             <div className="flex justify-between items-start">
               <div>
@@ -1314,4 +1274,179 @@ export default function App() {
                   {viajeActivo.numero_siniestro}
                 </span>
                 <h3 className="text-lg font-bold text-slate-900 mt-1">{viajeActivo.paciente_nombre}</h3>
-                <p className="text-xs text-slate
+                <p className="text-xs text-slate-500">DNI: {viajeActivo.paciente_dni}</p>
+              </div>
+              <a href={`tel:${viajeActivo.paciente_telefono}`} className="p-2.5 bg-emerald-50 text-[#34B37B] rounded-full">
+                <Phone className="w-5 h-5" />
+              </a>
+            </div>
+
+            <div className="space-y-2 bg-slate-50 p-3.5 rounded-xl text-xs">
+              <div><strong>Retirar en:</strong> {viajeActivo.origen_direccion}</div>
+              <div><strong>Llevar a:</strong> {viajeActivo.destino_nombre}</div>
+              <div><strong>Distancia GPS acumulada:</strong> {viajeActivo.km_reales} km</div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => cambiarEstadoViaje(viajeActivo.id, 'EN_CAMINO_DOMICILIO')}
+                className={`py-2.5 rounded-xl text-xs font-bold border ${viajeActivo.estado === 'EN_CAMINO_DOMICILIO' ? 'bg-[#1E588D] text-white' : 'bg-white text-slate-700'}`}
+              >
+                1. En Camino a Domicilio
+              </button>
+              <button
+                onClick={() => cambiarEstadoViaje(viajeActivo.id, 'EN_DOMICILIO')}
+                className={`py-2.5 rounded-xl text-xs font-bold border ${viajeActivo.estado === 'EN_DOMICILIO' ? 'bg-[#1E588D] text-white' : 'bg-white text-slate-700'}`}
+              >
+                2. Llegué a Puerta
+              </button>
+              <button
+                onClick={() => cambiarEstadoViaje(viajeActivo.id, 'PACIENTE_A_BORDO')}
+                className={`col-span-2 py-2.5 rounded-xl text-xs font-bold border ${viajeActivo.estado === 'PACIENTE_A_BORDO' ? 'bg-[#34B37B] text-white' : 'bg-white text-slate-700'}`}
+              >
+                3. Paciente a Bordo — Iniciar Traslado a Clínica
+              </button>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100">
+              <label className="block text-xs font-bold text-slate-700 mb-2">
+                Firma Digital del Paciente al Finalizar (Con el dedo en pantalla):
+              </label>
+              <SignaturePad
+                disabled={viajeActivo.estado === 'FINALIZADO'}
+                onSave={(dataUrl) => cambiarEstadoViaje(viajeActivo.id, 'FINALIZADO', { firma_url: dataUrl })}
+              />
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+            <h4 className="font-bold text-xs text-slate-700 uppercase">Chat Directo con el Paciente</h4>
+            <div className="max-h-40 overflow-y-auto space-y-2 bg-slate-50 p-3 rounded-xl">
+              {chatMensajes.map((m) => (
+                <div key={m.id} className={`text-xs p-2 rounded-lg max-w-[85%] ${m.rol === 'CHOFER' ? 'bg-[#1E588D] text-white ml-auto' : 'bg-white border text-slate-800'}`}>
+                  <div className="font-bold text-[10px] opacity-80">{m.nombre} • {m.hora}</div>
+                  <div>{m.texto}</div>
+                </div>
+              ))}
+            </div>
+            <form onSubmit={enviarMensajeChat} className="flex gap-2">
+              <input value={nuevoMensaje} onChange={(e) => setNuevoMensaje(e.target.value)} placeholder="Escribir mensaje al paciente..." className="flex-1 border rounded-xl px-3 py-2 text-xs" />
+              <button type="submit" className="px-3.5 py-2 bg-[#34B37B] text-white rounded-xl">
+                <Send className="w-4 h-4" />
+              </button>
+            </form>
+          </div>
+
+          {modalDesperfecto && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4">
+                <div className="flex items-center gap-2 text-red-600 font-bold text-base">
+                  <AlertTriangle className="w-6 h-6" /> Reportar Desperfecto Mecánico
+                </div>
+                <p className="text-xs text-slate-600">
+                  Esto enviará una alerta sonora inmediata a la Torre de Control de Erquenci ART con tu ubicación GPS para despachar un móvil de auxilio.
+                </p>
+                <textarea
+                  rows={3}
+                  value={textoFalla}
+                  onChange={(e) => setTextoFalla(e.target.value)}
+                  placeholder="Describí la falla (ej: Pinchadura de neumático en Av. Mitre, problema de embrague...)"
+                  className="w-full border rounded-xl p-3 text-xs"
+                />
+                <div className="flex justify-end gap-2">
+                  <button onClick={() => setModalDesperfecto(false)} className="px-4 py-2 text-xs font-semibold text-slate-600">Cancelar</button>
+                  <button onClick={enviarReporteDesperfecto} className="px-4 py-2 bg-red-600 text-white font-bold rounded-xl text-xs">
+                    Enviar Alerta Urgente a Central
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </main>
+      )}
+
+      {rolActivo === 'PACIENTE' && viajeActivo && (
+        <main className="max-w-lg w-full mx-auto px-4 py-6 space-y-5">
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+            <div className="bg-gradient-to-r from-[#1E588D] to-[#268786] p-5 text-white">
+              <div className="flex justify-between items-center text-xs opacity-90 mb-1">
+                <span>Traslado Autorizado ART</span>
+                <span>{viajeActivo.numero_siniestro}</span>
+              </div>
+              <h2 className="text-lg font-bold">Hola, {viajeActivo.paciente_nombre}</h2>
+              <p className="text-xs text-blue-100 mt-0.5">Estado actual: <strong>{viajeActivo.estado.replace(/_/g, ' ')}</strong></p>
+
+              <div className="mt-4 bg-white/20 rounded-full h-3 overflow-hidden">
+                <div
+                  className="bg-[#34B37B] h-full transition-all duration-700"
+                  style={{ width: `${viajeActivo.gps_progreso}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-[11px] mt-1.5 text-blue-100">
+                <span>Tu Domicilio</span>
+                <span>Móvil al {viajeActivo.gps_progreso}%</span>
+                <span>Clínica Destino</span>
+              </div>
+            </div>
+
+            <div className="p-4 pb-0">
+              <MapaSeguimientoGps
+                progreso={viajeActivo.gps_progreso}
+                origenTexto={viajeActivo.origen_direccion}
+                destinoTexto={viajeActivo.destino_nombre}
+                patente={vehiculoAsignado?.patente}
+                choferNombre={vehiculoAsignado?.chofer_nombre}
+                coordsReales={viajeActivo.coords_reales}
+              />
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={vehiculoAsignado?.chofer_foto}
+                    alt={vehiculoAsignado?.chofer_nombre}
+                    className="w-14 h-14 rounded-full object-cover border-2 border-[#34B37B]"
+                  />
+                  <div>
+                    <div className="text-[11px] font-bold text-[#34B37B] uppercase">Tu Chofer Asignado</div>
+                    <h3 className="font-bold text-base text-slate-900">{vehiculoAsignado?.chofer_nombre}</h3>
+                    <p className="text-xs text-slate-600">
+                      {vehiculoAsignado?.modelo} • Patente: <strong>{vehiculoAsignado?.patente}</strong>
+                    </p>
+                  </div>
+                </div>
+                <a href={`tel:${prestadorAsignado?.telefono_guardia}`} className="p-3 bg-blue-50 text-[#1E588D] rounded-full">
+                  <Phone className="w-5 h-5" />
+                </a>
+              </div>
+
+              <div className="bg-slate-50 p-3.5 rounded-xl text-xs space-y-1.5 text-slate-700">
+                <div><strong>Punto de retiro:</strong> {viajeActivo.origen_direccion}</div>
+                <div><strong>Destino médico:</strong> {viajeActivo.destino_nombre}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+            <h4 className="font-bold text-xs text-slate-700 uppercase">Chat con tu Chofer</h4>
+            <div className="max-h-40 overflow-y-auto space-y-2 bg-slate-50 p-3 rounded-xl">
+              {chatMensajes.map((m) => (
+                <div key={m.id} className={`text-xs p-2 rounded-lg max-w-[85%] ${m.rol === 'PACIENTE' ? 'bg-[#34B37B] text-white ml-auto' : 'bg-white border text-slate-800'}`}>
+                  <div className="font-bold text-[10px] opacity-80">{m.nombre} • {m.hora}</div>
+                  <div>{m.texto}</div>
+                </div>
+              ))}
+            </div>
+            <form onSubmit={enviarMensajeChat} className="flex gap-2">
+              <input value={nuevoMensaje} onChange={(e) => setNuevoMensaje(e.target.value)} placeholder="Escribile a tu chofer..." className="flex-1 border rounded-xl px-3 py-2 text-xs" />
+              <button type="submit" className="px-3.5 py-2 bg-[#1E588D] text-white rounded-xl">
+                <Send className="w-4 h-4" />
+              </button>
+            </form>
+          </div>
+        </main>
+      )}
+    </div>
+  );
+}
