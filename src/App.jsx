@@ -6,7 +6,9 @@ import {
   CheckCircle2, Clock, FileText, Plus, Send, Lock,
   Building2, Wrench, RefreshCw, Share2, Download, Car,
   Activity, Navigation, Camera, Upload, DollarSign,
-  FileSpreadsheet, MessageCircle, Search, Paperclip, Eye
+  FileSpreadsheet, MessageCircle, Search, Paperclip, Eye,
+  Trash2, Edit3, Filter, Users, Accessibility, Scale,
+  History, Repeat, Calendar, X, Check, Info
 } from 'lucide-react';
 
 // ============================================================================
@@ -48,6 +50,105 @@ const ErquenciLogo = ({ subtitle = "Torre de Control ART" }) => (
 );
 
 // ============================================================================
+// CATÁLOGOS DE CONDICIONES CLÍNICAS Y VEHÍCULOS ESPECIALES
+// ============================================================================
+const CONDICIONES_PACIENTE_LABELS = {
+  AMBULATORIO: 'Ambulatorio (Camina por sus medios)',
+  MOVILIDAD_REDUCIDA: 'Movilidad Reducida (Requiere asistencia)',
+  SILLA_DE_RUEDAS: 'En Silla de Ruedas',
+  BARIATRICO_PESO_ESPECIAL: 'Bariátrico / Peso Especial (+120-150 kg)',
+  POST_QUIRURGICO: 'Post-Quirúrgico / Férula o Yeso',
+};
+
+const ELEMENTOS_ORTOPEDICOS_LABELS = {
+  NINGUNO: 'Ninguno',
+  SILLA_RUEDAS_PLEGABLE: 'Silla de Ruedas Plegable (Baúl)',
+  SILLA_RUEDAS_RIGIDA: 'Silla de Ruedas Ortopédica / Rígida',
+  MULETAS_ANDADOR: 'Muletas / Andador / Bastón',
+  FERULA_PIERNA_EXTENDIDA: 'Férula / Yeso (Pierna extendida atrás)',
+};
+
+const TIPOS_VEHICULO_ESPECIAL_LABELS = {
+  ESTANDAR: 'Sedán Estándar',
+  VEHICULO_AMPLIO_150KG: 'Vehículo Amplio / Reforzado (Paciente +120/150 kg)',
+  BAUL_GRANDE_SILLA_RUEDAS: 'Sedán Baúl Grande / Rural (Silla de Ruedas)',
+  UTILITARIO_RAMPA_ACCESO_BAJO: 'Utilitario / SUV Acceso Cómodo',
+  ASIENTO_TRASERO_LIBRE_FKT: 'Habitáculo Trasero Despejado (Inmovilización)',
+};
+
+// Extrae las condiciones del traslado desde columnas nativas o desde el respaldo JSON en eventos
+const obtenerCondicionesTraslado = (t) => {
+  if (!t) {
+    return {
+      condicion_paciente: 'AMBULATORIO',
+      lleva_acompanante: false,
+      acompanante_detalle: '',
+      lleva_silla_ruedas: false,
+      elemento_ortopedico: 'NINGUNO',
+      requiere_vehiculo_especial: false,
+      peso_paciente_kg: '',
+      tipo_vehiculo_especial: 'ESTANDAR',
+      observaciones_traslado: '',
+    };
+  }
+  const metaEvento = (t.eventos || []).find((ev) => ev && ev.meta_condiciones)?.meta_condiciones || {};
+  const jsonCol = t.condiciones_traslado && typeof t.condiciones_traslado === 'object' ? t.condiciones_traslado : {};
+  const combinado = { ...metaEvento, ...jsonCol };
+
+  const peso = t.peso_paciente_kg ?? combinado.peso_paciente_kg ?? '';
+  const llevaAcomp = Boolean(t.lleva_acompanante ?? combinado.lleva_acompanante ?? false);
+  const llevaSilla = Boolean(t.lleva_silla_ruedas ?? combinado.lleva_silla_ruedas ?? false);
+  const reqEspecial = Boolean(
+    t.requiere_vehiculo_especial ??
+      combinado.requiere_vehiculo_especial ??
+      (Number(peso) >= 120)
+  );
+
+  return {
+    condicion_paciente: t.condicion_paciente || combinado.condicion_paciente || 'AMBULATORIO',
+    lleva_acompanante: llevaAcomp,
+    acompanante_detalle: t.acompanante_detalle ?? combinado.acompanante_detalle ?? '',
+    lleva_silla_ruedas: llevaSilla,
+    elemento_ortopedico:
+      t.elemento_ortopedico ||
+      combinado.elemento_ortopedico ||
+      (llevaSilla ? 'SILLA_RUEDAS_PLEGABLE' : 'NINGUNO'),
+    requiere_vehiculo_especial: reqEspecial,
+    peso_paciente_kg: peso,
+    tipo_vehiculo_especial:
+      t.tipo_vehiculo_especial ||
+      combinado.tipo_vehiculo_especial ||
+      (Number(peso) >= 120 ? 'VEHICULO_AMPLIO_150KG' : reqEspecial ? 'UTILITARIO_RAMPA_ACCESO_BAJO' : 'ESTANDAR'),
+    observaciones_traslado: t.observaciones_traslado ?? combinado.observaciones_traslado ?? '',
+  };
+};
+
+// Resumen legible en texto de las condiciones del traslado (para WhatsApp, PDF y CSV)
+const resumirCondicionesTexto = (t) => {
+  const c = obtenerCondicionesTraslado(t);
+  const partes = [];
+  if (c.condicion_paciente && c.condicion_paciente !== 'AMBULATORIO') {
+    partes.push(CONDICIONES_PACIENTE_LABELS[c.condicion_paciente] || c.condicion_paciente);
+  }
+  if (c.lleva_acompanante) {
+    partes.push(`Con Acompañante${c.acompanante_detalle ? ` (${c.acompanante_detalle})` : ''}`);
+  }
+  if (c.lleva_silla_ruedas || (c.elemento_ortopedico && c.elemento_ortopedico !== 'NINGUNO')) {
+    partes.push(ELEMENTOS_ORTOPEDICOS_LABELS[c.elemento_ortopedico] || 'Silla de Ruedas');
+  }
+  if (c.peso_paciente_kg) {
+    partes.push(`Peso Paciente: ${c.peso_paciente_kg} kg`);
+  }
+  if (c.requiere_vehiculo_especial) {
+    partes.push(TIPOS_VEHICULO_ESPECIAL_LABELS[c.tipo_vehiculo_especial] || 'Vehículo Especial');
+  }
+  if (c.observaciones_traslado) {
+    partes.push(`Obs: ${c.observaciones_traslado}`);
+  }
+  return partes.length > 0 ? partes.join(' | ') : 'Ambulatorio estándar (sin requerimientos especiales)';
+};
+
+// ============================================================================
 // GEOCODIFICACIÓN GRATUITA EN SAN RAFAEL / MENDOZA (OPENSTREETMAP NOMINATIM)
 // ============================================================================
 const buscarCoordenadasDireccion = async (direccion) => {
@@ -76,8 +177,67 @@ const calcularDistanciaKm = (lat1, lng1, lat2, lng2) => {
       Math.sin(dLng / 2) *
       Math.sin(dLng / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  // Factor urbano 1.25 sobre línea recta
   return +(R * c * 1.25).toFixed(1);
+};
+
+// ============================================================================
+// BADGES VISUALES DE CONDICIONES DEL TRASLADO
+// ============================================================================
+const BadgesCondicionesTraslado = ({ traslado, mostrarObservaciones = false }) => {
+  const c = obtenerCondicionesTraslado(traslado);
+  const tieneEspecial =
+    c.lleva_acompanante ||
+    c.lleva_silla_ruedas ||
+    c.requiere_vehiculo_especial ||
+    Number(c.peso_paciente_kg) > 0 ||
+    (c.condicion_paciente && c.condicion_paciente !== 'AMBULATORIO') ||
+    Boolean(c.observaciones_traslado);
+
+  if (!tieneEspecial) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600">
+        Ambulatorio Estándar
+      </span>
+    );
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {c.condicion_paciente && c.condicion_paciente !== 'AMBULATORIO' && (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+            <Activity className="w-3 h-3" />
+            {CONDICIONES_PACIENTE_LABELS[c.condicion_paciente] || c.condicion_paciente}
+          </span>
+        )}
+        {c.lleva_acompanante && (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+            <Users className="w-3 h-3" />
+            Con Acompañante{c.acompanante_detalle ? `: ${c.acompanante_detalle}` : ''}
+          </span>
+        )}
+        {(c.lleva_silla_ruedas || (c.elemento_ortopedico && c.elemento_ortopedico !== 'NINGUNO')) && (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
+            <Accessibility className="w-3 h-3" />
+            {ELEMENTOS_ORTOPEDICOS_LABELS[c.elemento_ortopedico] || 'Silla de Ruedas'}
+          </span>
+        )}
+        {(c.requiere_vehiculo_especial || Number(c.peso_paciente_kg) >= 100) && (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-300">
+            <Scale className="w-3 h-3" />
+            {c.peso_paciente_kg ? `${c.peso_paciente_kg} kg • ` : ''}
+            {TIPOS_VEHICULO_ESPECIAL_LABELS[c.tipo_vehiculo_especial] || 'Vehículo Especial'}
+          </span>
+        )}
+      </div>
+      {mostrarObservaciones && c.observaciones_traslado && (
+        <div className="text-xs bg-amber-50/80 border border-amber-200 text-amber-900 px-3 py-1.5 rounded-lg flex items-start gap-1.5">
+          <Info className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+          <span><strong>Indicación Operativa / Médica:</strong> {c.observaciones_traslado}</span>
+        </div>
+      )}
+    </div>
+  );
 };
 
 // ============================================================================
@@ -225,6 +385,7 @@ const MapaGeneralFlota = ({ trasladosActivos, vehiculos }) => {
 
     trasladosActivos.forEach((t) => {
       const veh = vehiculos.find((v) => v.id === t.vehiculo_id);
+      const cond = obtenerCondicionesTraslado(t);
       const orig = t.origen_lat && t.origen_lng ? [t.origen_lat, t.origen_lng] : [-34.6245, -68.3480];
       const dest = t.destino_lat && t.destino_lng ? [t.destino_lat, t.destino_lng] : [-34.6148, -68.3265];
       const factor = Math.min(100, Math.max(0, t.gps_progreso || 20)) / 100;
@@ -232,17 +393,18 @@ const MapaGeneralFlota = ({ trasladosActivos, vehiculos }) => {
         ? [t.coords_reales.lat, t.coords_reales.lng]
         : [orig[0] + (dest[0] - orig[0]) * factor, orig[1] + (dest[1] - orig[1]) * factor];
 
+      const badgeExtra = cond.lleva_silla_ruedas ? ' ♿' : cond.requiere_vehiculo_especial ? ' ⭐' : '';
       const icon = L.divIcon({
         className: 'fleet-pin',
-        html: `<div style="background:${t.estado === 'ALERTA_DESPERFECTO' ? '#dc2626' : '#1E588D'};color:white;padding:3px 8px;border-radius:999px;font-weight:800;font-size:10px;border:2px solid #34B37B;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.3);">🚕 ${veh?.patente || 'Móvil'} • ${t.paciente_nombre.split(' ')[0]}</div>`,
-        iconSize: [110, 24],
-        iconAnchor: [55, 12],
+        html: `<div style="background:${t.estado === 'ALERTA_DESPERFECTO' ? '#dc2626' : '#1E588D'};color:white;padding:3px 8px;border-radius:999px;font-weight:800;font-size:10px;border:2px solid #34B37B;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.3);">🚕 ${veh?.patente || 'Móvil'} • ${(t.paciente_nombre || '').split(' ')[0]}${badgeExtra}</div>`,
+        iconSize: [120, 24],
+        iconAnchor: [60, 12],
       });
 
       L.marker(pos, { icon })
         .addTo(map)
         .bindPopup(
-          `<b>${veh?.patente || 'Unidad'}</b> (${veh?.chofer_nombre || ''})<br/>Paciente: ${t.paciente_nombre}<br/>Destino: ${t.destino_nombre}<br/>Estado: ${t.estado}`
+          `<b>${veh?.patente || 'Unidad'}</b> (${veh?.chofer_nombre || ''})<br/>Paciente: ${t.paciente_nombre}<br/>Condición: ${resumirCondicionesTexto(t)}<br/>Destino: ${t.destino_nombre}<br/>Estado: ${t.estado}`
         );
     });
 
@@ -262,7 +424,7 @@ const MapaGeneralFlota = ({ trasladosActivos, vehiculos }) => {
         <span className="font-bold flex items-center gap-2">
           <Navigation className="w-4 h-4 text-[#34B37B]" /> Radar Satelital de Flota en Tiempo Real (San Rafael)
         </span>
-        <span className="text-[11px] text-slate-300">{trasladosActivos.length} unidades monitoreadas</span>
+        <span className="text-[11px] text-slate-300">{trasladosActivos.length} traslados en vista</span>
       </div>
       <div ref={mapRef} className="w-full h-64 z-10" />
     </div>
@@ -365,6 +527,7 @@ const SignaturePad = ({ onSave, disabled }) => {
 // CÁLCULO DE SEMÁFORO DE VENCIMIENTOS LEGALES
 // ============================================================================
 const evaluarVencimiento = (fechaStr) => {
+  if (!fechaStr) return { estado: 'VIGENTE', dias: 99, badge: 'bg-emerald-100 text-emerald-700 border-emerald-300', bloqueado: false };
   const hoy = new Date();
   const venc = new Date(fechaStr + 'T00:00:00');
   const diffDias = Math.ceil((venc - hoy) / (1000 * 60 * 60 * 24));
@@ -372,6 +535,233 @@ const evaluarVencimiento = (fechaStr) => {
   if (diffDias <= 30) return { estado: 'POR VENCER', dias: diffDias, badge: 'bg-amber-100 text-amber-800 border-amber-300', bloqueado: false };
   return { estado: 'VIGENTE', dias: diffDias, badge: 'bg-emerald-100 text-emerald-700 border-emerald-300', bloqueado: false };
 };
+
+// ============================================================================
+// BLOQUE REUTILIZABLE DE FORMULARIO DE CONDICIONES DEL TRASLADO
+// ============================================================================
+const FormularioCondicionesTraslado = ({ state, onChange }) => {
+  const handlePesoChange = (val) => {
+    const num = Number(val);
+    const autoEspecial = num >= 120;
+    onChange({
+      ...state,
+      peso_paciente_kg: val,
+      requiere_vehiculo_especial: autoEspecial ? true : state.requiere_vehiculo_especial,
+      condicion_paciente: autoEspecial ? 'BARIATRICO_PESO_ESPECIAL' : state.condicion_paciente,
+      tipo_vehiculo_especial: autoEspecial ? 'VEHICULO_AMPLIO_150KG' : state.tipo_vehiculo_especial,
+    });
+  };
+
+  const handleSillaChange = (checked) => {
+    onChange({
+      ...state,
+      lleva_silla_ruedas: checked,
+      condicion_paciente: checked && state.condicion_paciente === 'AMBULATORIO' ? 'SILLA_DE_RUEDAS' : state.condicion_paciente,
+      elemento_ortopedico: checked
+        ? state.elemento_ortopedico === 'NINGUNO'
+          ? 'SILLA_RUEDAS_PLEGABLE'
+          : state.elemento_ortopedico
+        : 'NINGUNO',
+      tipo_vehiculo_especial:
+        checked && state.tipo_vehiculo_especial === 'ESTANDAR'
+          ? 'BAUL_GRANDE_SILLA_RUEDAS'
+          : state.tipo_vehiculo_especial,
+    });
+  };
+
+  return (
+    <div className="sm:col-span-2 p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2.5">
+        <div>
+          <h4 className="text-xs font-extrabold uppercase tracking-wider text-[#1E588D] flex items-center gap-1.5">
+            <Accessibility className="w-4 h-4 text-[#34B37B]" />
+            Condiciones Clínicas y Requerimientos del Traslado
+          </h4>
+          <p className="text-[11px] text-slate-500">
+            Especificá si viaja con acompañante, silla de ruedas o requiere unidad amplia por peso (ej. 150 kg).
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 mb-1">Condición General del Paciente</label>
+          <select
+            value={state.condicion_paciente || 'AMBULATORIO'}
+            onChange={(e) => {
+              const val = e.target.value;
+              onChange({
+                ...state,
+                condicion_paciente: val,
+                lleva_silla_ruedas: val === 'SILLA_DE_RUEDAS' ? true : state.lleva_silla_ruedas,
+                requiere_vehiculo_especial:
+                  val === 'BARIATRICO_PESO_ESPECIAL' ? true : state.requiere_vehiculo_especial,
+                tipo_vehiculo_especial:
+                  val === 'BARIATRICO_PESO_ESPECIAL'
+                    ? 'VEHICULO_AMPLIO_150KG'
+                    : val === 'SILLA_DE_RUEDAS'
+                    ? 'BAUL_GRANDE_SILLA_RUEDAS'
+                    : state.tipo_vehiculo_especial,
+              });
+            }}
+            className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs bg-white font-medium"
+          >
+            {Object.entries(CONDICIONES_PACIENTE_LABELS).map(([k, label]) => (
+              <option key={k} value={k}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 mb-1">
+            Peso Estimado del Paciente (kg) <span className="text-slate-400 font-normal">(Opcional)</span>
+          </label>
+          <div className="relative">
+            <input
+              type="number"
+              min="1"
+              max="350"
+              value={state.peso_paciente_kg || ''}
+              onChange={(e) => handlePesoChange(e.target.value)}
+              placeholder="Ej: 150 (activa alerta vehículo amplio >= 120 kg)"
+              className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs bg-white"
+            />
+          </div>
+          {Number(state.peso_paciente_kg) >= 120 && (
+            <p className="text-[11px] text-rose-600 font-bold mt-1 flex items-center gap-1">
+              <Scale className="w-3.5 h-3.5" /> Paciente de {state.peso_paciente_kg} kg: se activó requerimiento de Vehículo Amplio / Especial.
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* 3 Tarjetas de Switches: Acompañante, Silla de Ruedas, Vehículo Especial */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {/* Acompañante */}
+        <div
+          className={`p-3 rounded-xl border transition ${
+            state.lleva_acompanante ? 'bg-purple-50/70 border-purple-300' : 'bg-white border-slate-200'
+          }`}
+        >
+          <label className="flex items-center justify-between cursor-pointer">
+            <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <Users className="w-4 h-4 text-purple-600" /> ¿Con Acompañante?
+            </span>
+            <input
+              type="checkbox"
+              checked={Boolean(state.lleva_acompanante)}
+              onChange={(e) => onChange({ ...state, lleva_acompanante: e.target.checked })}
+              className="w-4 h-4 accent-purple-600 rounded"
+            />
+          </label>
+          {state.lleva_acompanante && (
+            <input
+              type="text"
+              value={state.acompanante_detalle || ''}
+              onChange={(e) => onChange({ ...state, acompanante_detalle: e.target.value })}
+              placeholder="Nombre / Vínculo (ej: Esposa)"
+              className="mt-2 w-full border border-purple-200 rounded-lg px-2.5 py-1.5 text-xs bg-white"
+            />
+          )}
+        </div>
+
+        {/* Silla de ruedas / Ortopedia */}
+        <div
+          className={`p-3 rounded-xl border transition ${
+            state.lleva_silla_ruedas ? 'bg-amber-50/70 border-amber-300' : 'bg-white border-slate-200'
+          }`}
+        >
+          <label className="flex items-center justify-between cursor-pointer">
+            <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <Accessibility className="w-4 h-4 text-amber-600" /> ¿Silla de Ruedas?
+            </span>
+            <input
+              type="checkbox"
+              checked={Boolean(state.lleva_silla_ruedas)}
+              onChange={(e) => handleSillaChange(e.target.checked)}
+              className="w-4 h-4 accent-amber-600 rounded"
+            />
+          </label>
+          {state.lleva_silla_ruedas && (
+            <select
+              value={state.elemento_ortopedico || 'SILLA_RUEDAS_PLEGABLE'}
+              onChange={(e) => onChange({ ...state, elemento_ortopedico: e.target.value })}
+              className="mt-2 w-full border border-amber-200 rounded-lg px-2 py-1.5 text-xs bg-white font-medium"
+            >
+              {Object.entries(ELEMENTOS_ORTOPEDICOS_LABELS)
+                .filter(([k]) => k !== 'NINGUNO')
+                .map(([k, label]) => (
+                  <option key={k} value={k}>
+                    {label}
+                  </option>
+                ))}
+            </select>
+          )}
+        </div>
+
+        {/* Vehículo Especial */}
+        <div
+          className={`p-3 rounded-xl border transition ${
+            state.requiere_vehiculo_especial ? 'bg-rose-50/70 border-rose-300' : 'bg-white border-slate-200'
+          }`}
+        >
+          <label className="flex items-center justify-between cursor-pointer">
+            <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <Car className="w-4 h-4 text-rose-600" /> ¿Vehículo Especial?
+            </span>
+            <input
+              type="checkbox"
+              checked={Boolean(state.requiere_vehiculo_especial)}
+              onChange={(e) =>
+                onChange({
+                  ...state,
+                  requiere_vehiculo_especial: e.target.checked,
+                  tipo_vehiculo_especial: e.target.checked
+                    ? state.tipo_vehiculo_especial === 'ESTANDAR'
+                      ? 'VEHICULO_AMPLIO_150KG'
+                      : state.tipo_vehiculo_especial
+                    : 'ESTANDAR',
+                })
+              }
+              className="w-4 h-4 accent-rose-600 rounded"
+            />
+          </label>
+          {state.requiere_vehiculo_especial && (
+            <select
+              value={state.tipo_vehiculo_especial || 'VEHICULO_AMPLIO_150KG'}
+              onChange={(e) => onChange({ ...state, tipo_vehiculo_especial: e.target.value })}
+              className="mt-2 w-full border border-rose-200 rounded-lg px-2 py-1.5 text-xs bg-white font-medium"
+            >
+              {Object.entries(TIPOS_VEHICULO_ESPECIAL_LABELS)
+                .filter(([k]) => k !== 'ESTANDAR')
+                .map(([k, label]) => (
+                  <option key={k} value={k}>
+                    {label}
+                  </option>
+                ))}
+            </select>
+          )}
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-xs font-semibold text-slate-700 mb-1">
+          Observaciones Clínicas / Indicaciones para el Chofer
+        </label>
+        <input
+          type="text"
+          value={state.observaciones_traslado || ''}
+          onChange={(e) => onChange({ ...state, observaciones_traslado: e.target.value })}
+          placeholder="Ej: Paciente de 150 kg con rodilla inmovilizada, correr asiento delantero al máximo y asistir en escalón..."
+          className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs bg-white"
+        />
+      </div>
+    </div>
+  );
+};
+
 // ============================================================================
 // APLICACIÓN PRINCIPAL ERQUENCI ART SAAS
 // ============================================================================
@@ -405,17 +795,17 @@ export default function App() {
   const [nuevoCentro, setNuevoCentro] = useState({ nombre: '', direccion: '' });
 
   const [prestadores, setPrestadores] = useState([
-    { id: '22222222-2222-2222-2222-222222222221', razon_social: 'Erquenci Flota San Rafael S.A.S.', cuit: '30-71999111-4', zona_cobertura: 'San Rafael, Mendoza', telefono_guardia: '2604551122', habilitado_operar: true },
+    { id: '22222222-2222-2222-2222-222222222221', razon_social: 'Erquenci Flota San Rafael S.A.S.', cuit: '30-71792870-5', zona_cobertura: 'San Rafael, Mendoza', telefono_guardia: '2604017356', habilitado_operar: true },
   ]);
 
   const [vehiculos, setVehiculos] = useState([
     {
       id: '33333333-3333-3333-3333-333333333331',
       prestador_id: '22222222-2222-2222-2222-222222222221',
-      patente: 'AE 842 KL',
-      modelo: 'Peugeot 408 Feline',
-      tipo_movilidad: 'AMBULATORIO',
-      chofer_nombre: 'Martín Rodríguez',
+      patente: 'AB 635 BN',
+      modelo: 'Peugeot 408 1.6 HDI Feline (Sedán Amplio)',
+      tipo_movilidad: 'AMPLIO_150KG_SILLA',
+      chofer_nombre: 'Matías Emanuel Gatica',
       chofer_foto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
       licencia_venc: '2027-08-15',
       docs: [
@@ -429,7 +819,7 @@ export default function App() {
 
   const [traslados, setTraslados] = useState([]);
   const [viajeSeleccionadoId, setViajeSeleccionadoId] = useState(null);
-  const [tabAdmin, setTabAdmin] = useState('TORRE'); // TORRE | NUEVO_VIAJE | LIQUIDACION | FLOTA | PRESTADORES
+  const [tabAdmin, setTabAdmin] = useState('TORRE'); // TORRE | NUEVO_VIAJE | HISTORIAL | LIQUIDACION | FLOTA | PRESTADORES
   const [filtroArtLiquidacion, setFiltroArtLiquidacion] = useState('TODAS');
   const [nuevoMensaje, setNuevoMensaje] = useState('');
   const [modalDesperfecto, setModalDesperfecto] = useState(false);
@@ -437,7 +827,26 @@ export default function App() {
   const [gpsRealActivo, setGpsRealActivo] = useState(false);
   const [buscandoGeo, setBuscandoGeo] = useState(false);
 
-  // Formularios
+  // ============================================================================
+  // ESTADOS DE FILTROS AVANZADOS, EDICIÓN Y RECURRENCIA
+  // ============================================================================
+  const [busquedaTorre, setBusquedaTorre] = useState('');
+  const [filtroArtTorre, setFiltroArtTorre] = useState('TODAS');
+  const [filtroEstadoTorre, setFiltroEstadoTorre] = useState('TODOS');
+  const [filtroFechaTorre, setFiltroFechaTorre] = useState('');
+  const [filtroCondicionTorre, setFiltroCondicionTorre] = useState('TODAS');
+  const [busquedaHistorial, setBusquedaHistorial] = useState('');
+  const [pacienteHistorialExpandido, setPacienteHistorialExpandido] = useState(null);
+
+  // Modal de Edición de Traslado
+  const [trasladoEditando, setTrasladoEditando] = useState(null);
+
+  // Recurrencia en Nuevo Traslado (FKT / Rehabilitación)
+  const [esRecurrente, setEsRecurrente] = useState(false);
+  const [cantidadSesiones, setCantidadSesiones] = useState(5);
+  const [frecuenciaSesiones, setFrecuenciaSesiones] = useState('LUN_MIE_VIE'); // DIARIO_HABIL | LUN_MIE_VIE | MAR_JUE
+
+  // Formulario de Nuevo Traslado
   const [nuevoViaje, setNuevoViaje] = useState({
     art_nombre: 'Prevención ART',
     modalidad_viaje: 'IDA_VUELTA',
@@ -454,7 +863,18 @@ export default function App() {
     orden_adjunta_url: '',
     prestador_id: '22222222-2222-2222-2222-222222222221',
     vehiculo_id: '33333333-3333-3333-3333-333333333331',
+    fecha_programada: new Date().toISOString().split('T')[0],
     hora_programada: '11:30',
+    // Condiciones Clínicas y Operativas del Traslado
+    condicion_paciente: 'AMBULATORIO',
+    lleva_acompanante: false,
+    acompanante_detalle: '',
+    lleva_silla_ruedas: false,
+    elemento_ortopedico: 'NINGUNO',
+    requiere_vehiculo_especial: false,
+    peso_paciente_kg: '',
+    tipo_vehiculo_especial: 'ESTANDAR',
+    observaciones_traslado: '',
   });
 
   const [nuevoPrestador, setNuevoPrestador] = useState({ razon_social: '', cuit: '', zona_cobertura: 'San Rafael, Mendoza', telefono_guardia: '' });
@@ -462,7 +882,7 @@ export default function App() {
     prestador_id: '22222222-2222-2222-2222-222222222221',
     patente: '',
     modelo: '',
-    tipo_movilidad: 'AMBULATORIO',
+    tipo_movilidad: 'AMPLIO_150KG_SILLA',
     chofer_nombre: '',
     chofer_foto: '',
     licencia_venc: '2027-06-01',
@@ -534,7 +954,6 @@ export default function App() {
       if (session) setModoDemo(false);
     });
 
-    // Suscripción en tiempo real a cambios en traslados
     const channel = supabase
       .channel('traslados-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'traslados' }, () => {
@@ -648,9 +1067,50 @@ export default function App() {
     return licVencida || docVencido;
   };
 
+  // Filtrado de traslados en Torre de Control
+  const trasladosFiltradosTorre = traslados.filter((t) => {
+    const cond = obtenerCondicionesTraslado(t);
+    const veh = vehiculos.find((v) => v.id === t.vehiculo_id);
+    const texto = busquedaTorre.trim().toLowerCase();
+    if (texto) {
+      const matchTexto =
+        (t.paciente_nombre || '').toLowerCase().includes(texto) ||
+        (t.paciente_dni || '').toLowerCase().includes(texto) ||
+        (t.numero_siniestro || '').toLowerCase().includes(texto) ||
+        (t.origen_direccion || '').toLowerCase().includes(texto) ||
+        (t.destino_nombre || '').toLowerCase().includes(texto) ||
+        (veh?.patente || '').toLowerCase().includes(texto) ||
+        (veh?.chofer_nombre || '').toLowerCase().includes(texto);
+      if (!matchTexto) return false;
+    }
+    if (filtroArtTorre !== 'TODAS' && t.art_nombre !== filtroArtTorre) return false;
+    if (filtroEstadoTorre === 'EN_CURSO') {
+      if (t.estado === 'FINALIZADO' || t.estado === 'CANCELADO') return false;
+    } else if (filtroEstadoTorre !== 'TODOS' && t.estado !== filtroEstadoTorre) {
+      return false;
+    }
+    if (filtroFechaTorre && t.fecha_programada !== filtroFechaTorre) return false;
+    if (filtroCondicionTorre === 'CON_ACOMPANANTE' && !cond.lleva_acompanante) return false;
+    if (
+      filtroCondicionTorre === 'CON_SILLA_RUEDAS' &&
+      !cond.lleva_silla_ruedas &&
+      cond.elemento_ortopedico === 'NINGUNO'
+    )
+      return false;
+    if (
+      filtroCondicionTorre === 'VEHICULO_ESPECIAL' &&
+      !cond.requiere_vehiculo_especial &&
+      Number(cond.peso_paciente_kg || 0) < 120
+    )
+      return false;
+
+    return true;
+  });
+
   const viajeActivo =
     (pacienteTokenUrl ? traslados.find((t) => t.token_paciente === pacienteTokenUrl) : null) ||
     traslados.find((t) => t.id === viajeSeleccionadoId) ||
+    trasladosFiltradosTorre[0] ||
     traslados[0];
 
   const vehiculoAsignado = vehiculos.find((v) => v.id === viajeActivo?.vehiculo_id);
@@ -690,6 +1150,136 @@ export default function App() {
     await supabase.from('traslados').update(patch).eq('id', id);
   };
 
+  // Eliminar un traslado con confirmación
+  const eliminarTraslado = async (t, e) => {
+    if (e) e.stopPropagation();
+    const ok = window.confirm(
+      `¿Confirmás eliminar el traslado de ${t.paciente_nombre} (Siniestro ${t.numero_siniestro} - ${t.fecha_programada})?`
+    );
+    if (!ok) return;
+
+    const { error } = await supabase.from('traslados').delete().eq('id', t.id);
+    if (error) {
+      console.warn('Aviso al eliminar en Supabase:', error.message);
+    }
+    const restantes = traslados.filter((item) => item.id !== t.id);
+    setTraslados(restantes);
+    if (viajeSeleccionadoId === t.id) {
+      setViajeSeleccionadoId(restantes[0]?.id || null);
+    }
+  };
+
+  // Abrir modal de edición con datos y condiciones normalizadas
+  const abrirModalEdicion = (t, e) => {
+    if (e) e.stopPropagation();
+    const cond = obtenerCondicionesTraslado(t);
+    setTrasladoEditando({
+      ...t,
+      ...cond,
+    });
+  };
+
+  // Guardar edición de un traslado en Supabase (con respaldo automático en eventos JSONB)
+  const guardarEdicionTraslado = async (e) => {
+    e.preventDefault();
+    if (!trasladoEditando) return;
+
+    const nuevoImporte = calcularImporteTraslado(
+      trasladoEditando.art_nombre,
+      trasladoEditando.km_reales || 4.5,
+      trasladoEditando.horas_espera || 0,
+      trasladoEditando.modalidad_viaje
+    );
+
+    const condicionesObj = {
+      condicion_paciente: trasladoEditando.condicion_paciente || 'AMBULATORIO',
+      lleva_acompanante: Boolean(trasladoEditando.lleva_acompanante),
+      acompanante_detalle: trasladoEditando.acompanante_detalle || '',
+      lleva_silla_ruedas: Boolean(trasladoEditando.lleva_silla_ruedas),
+      elemento_ortopedico: trasladoEditando.elemento_ortopedico || 'NINGUNO',
+      requiere_vehiculo_especial: Boolean(trasladoEditando.requiere_vehiculo_especial),
+      peso_paciente_kg: trasladoEditando.peso_paciente_kg ? Number(trasladoEditando.peso_paciente_kg) : null,
+      tipo_vehiculo_especial: trasladoEditando.tipo_vehiculo_especial || 'ESTANDAR',
+      observaciones_traslado: trasladoEditando.observaciones_traslado || '',
+    };
+
+    const eventosPrevios = Array.isArray(trasladoEditando.eventos) ? [...trasladoEditando.eventos] : [];
+    if (eventosPrevios.length > 0) {
+      eventosPrevios[0] = { ...eventosPrevios[0], meta_condiciones: condicionesObj };
+    } else {
+      eventosPrevios.push({
+        hora: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+        estado: trasladoEditando.estado || 'ASIGNADO',
+        detalle: 'Traslado actualizado',
+        meta_condiciones: condicionesObj,
+      });
+    }
+
+    const basePatch = {
+      art_nombre: trasladoEditando.art_nombre,
+      modalidad_viaje: trasladoEditando.modalidad_viaje,
+      prestador_id: trasladoEditando.prestador_id,
+      vehiculo_id: trasladoEditando.vehiculo_id,
+      paciente_nombre: trasladoEditando.paciente_nombre,
+      paciente_dni: trasladoEditando.paciente_dni,
+      paciente_telefono: trasladoEditando.paciente_telefono,
+      numero_siniestro: trasladoEditando.numero_siniestro,
+      origen_direccion: trasladoEditando.origen_direccion,
+      destino_nombre: trasladoEditando.destino_nombre,
+      fecha_programada: trasladoEditando.fecha_programada,
+      hora_programada: trasladoEditando.hora_programada,
+      estado: trasladoEditando.estado,
+      km_reales: Number(trasladoEditando.km_reales || 4.5),
+      horas_espera: Number(trasladoEditando.horas_espera || 0),
+      importe_total: nuevoImporte,
+      eventos: eventosPrevios,
+    };
+
+    const fullPatch = {
+      ...basePatch,
+      ...condicionesObj,
+      condiciones_traslado: condicionesObj,
+    };
+
+    let { error } = await supabase.from('traslados').update(fullPatch).eq('id', trasladoEditando.id);
+    if (error) {
+      // Fallback si aún no corrieron migracion_supabase.sql
+      await supabase.from('traslados').update(basePatch).eq('id', trasladoEditando.id);
+    }
+
+    setTraslados((prev) =>
+      prev.map((item) => (item.id === trasladoEditando.id ? { ...item, ...fullPatch } : item))
+    );
+    setTrasladoEditando(null);
+  };
+
+  // Precargar un nuevo traslado a partir de un paciente del historial o viaje previo
+  const repetirTrasladoPaciente = (t, e) => {
+    if (e) e.stopPropagation();
+    const cond = obtenerCondicionesTraslado(t);
+    setNuevoViaje({
+      art_nombre: t.art_nombre || 'Prevención ART',
+      modalidad_viaje: t.modalidad_viaje || 'IDA_VUELTA',
+      paciente_nombre: t.paciente_nombre || '',
+      paciente_dni: t.paciente_dni || '',
+      paciente_telefono: t.paciente_telefono || '',
+      numero_siniestro: t.numero_siniestro || '',
+      origen_direccion: t.origen_direccion || '',
+      origen_lat: t.origen_lat || -34.6245,
+      origen_lng: t.origen_lng || -68.3480,
+      destino_nombre: t.destino_nombre || 'Policlínica San Rafael (Av. Mitre 650, San Rafael)',
+      destino_lat: t.destino_lat || -34.6148,
+      destino_lng: t.destino_lng || -68.3265,
+      orden_adjunta_url: t.orden_adjunta_url || '',
+      prestador_id: t.prestador_id || prestadores[0]?.id,
+      vehiculo_id: t.vehiculo_id || vehiculos[0]?.id,
+      fecha_programada: new Date().toISOString().split('T')[0],
+      hora_programada: t.hora_programada || '11:30',
+      ...cond,
+    });
+    setTabAdmin('NUEVO_VIAJE');
+  };
+
   const enviarReporteDesperfecto = () => {
     if (!textoFalla.trim() || !viajeActivo) return;
     cambiarEstadoViaje(viajeActivo.id, 'ALERTA_DESPERFECTO', { falla_reportada: textoFalla });
@@ -707,7 +1297,31 @@ export default function App() {
     });
   };
 
-  // Crear nuevo traslado y guardarlo en Supabase
+  // Calcular fechas para traslados recurrentes (FKT / Rehabilitación)
+  const generarFechasRecurrentes = (fechaInicioStr, totalSesiones, patron) => {
+    if (!esRecurrente || totalSesiones <= 1) return [fechaInicioStr];
+    const fechas = [];
+    const cursor = new Date(fechaInicioStr + 'T12:00:00');
+    let guard = 0;
+    while (fechas.length < totalSesiones && guard < 90) {
+      const diaSemana = cursor.getDay(); // 0 Dom, 1 Lun, ..., 6 Sab
+      const iso = cursor.toISOString().split('T')[0];
+      if (fechas.length === 0) {
+        fechas.push(iso);
+      } else if (patron === 'DIARIO_HABIL' && diaSemana >= 1 && diaSemana <= 5) {
+        fechas.push(iso);
+      } else if (patron === 'LUN_MIE_VIE' && (diaSemana === 1 || diaSemana === 3 || diaSemana === 5)) {
+        fechas.push(iso);
+      } else if (patron === 'MAR_JUE' && (diaSemana === 2 || diaSemana === 4)) {
+        fechas.push(iso);
+      }
+      cursor.setDate(cursor.getDate() + 1);
+      guard++;
+    }
+    return fechas;
+  };
+
+  // Crear nuevo traslado (o lote recurrente FKT) y guardarlo en Supabase
   const crearNuevoTraslado = async (e) => {
     e.preventDefault();
     const veh = vehiculos.find((v) => v.id === nuevoViaje.vehiculo_id);
@@ -729,7 +1343,25 @@ export default function App() {
       nuevoViaje.modalidad_viaje
     );
 
-    const payload = {
+    const condicionesObj = {
+      condicion_paciente: nuevoViaje.condicion_paciente || 'AMBULATORIO',
+      lleva_acompanante: Boolean(nuevoViaje.lleva_acompanante),
+      acompanante_detalle: nuevoViaje.acompanante_detalle || '',
+      lleva_silla_ruedas: Boolean(nuevoViaje.lleva_silla_ruedas),
+      elemento_ortopedico: nuevoViaje.elemento_ortopedico || 'NINGUNO',
+      requiere_vehiculo_especial: Boolean(nuevoViaje.requiere_vehiculo_especial),
+      peso_paciente_kg: nuevoViaje.peso_paciente_kg ? Number(nuevoViaje.peso_paciente_kg) : null,
+      tipo_vehiculo_especial: nuevoViaje.tipo_vehiculo_especial || 'ESTANDAR',
+      observaciones_traslado: nuevoViaje.observaciones_traslado || '',
+    };
+
+    const fechasProgramadas = generarFechasRecurrentes(
+      nuevoViaje.fecha_programada || new Date().toISOString().split('T')[0],
+      Number(cantidadSesiones || 1),
+      frecuenciaSesiones
+    );
+
+    const listaBase = fechasProgramadas.map((fechaStr, idx) => ({
       art_nombre: nuevoViaje.art_nombre,
       modalidad_viaje: nuevoViaje.modalidad_viaje,
       prestador_id: nuevoViaje.prestador_id,
@@ -737,7 +1369,10 @@ export default function App() {
       paciente_nombre: nuevoViaje.paciente_nombre,
       paciente_dni: nuevoViaje.paciente_dni,
       paciente_telefono: nuevoViaje.paciente_telefono,
-      numero_siniestro: nuevoViaje.numero_siniestro,
+      numero_siniestro:
+        fechasProgramadas.length > 1
+          ? `${nuevoViaje.numero_siniestro} (Sesión ${idx + 1}/${fechasProgramadas.length})`
+          : nuevoViaje.numero_siniestro,
       origen_direccion: nuevoViaje.origen_direccion,
       origen_lat: nuevoViaje.origen_lat,
       origen_lng: nuevoViaje.origen_lng,
@@ -745,7 +1380,7 @@ export default function App() {
       destino_lat: nuevoViaje.destino_lat,
       destino_lng: nuevoViaje.destino_lng,
       orden_adjunta_url: nuevoViaje.orden_adjunta_url || null,
-      fecha_programada: new Date().toISOString().split('T')[0],
+      fecha_programada: fechaStr,
       hora_programada: nuevoViaje.hora_programada,
       estado: 'ASIGNADO',
       km_reales: kmEstimados,
@@ -756,20 +1391,40 @@ export default function App() {
         {
           hora: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
           estado: 'ASIGNADO',
-          detalle: `Orden emitida (${nuevoViaje.art_nombre}) por Torre de Control Erquenci`,
+          detalle: `Orden emitida (${nuevoViaje.art_nombre}) — ${resumirCondicionesTexto(nuevoViaje)}`,
+          meta_condiciones: condicionesObj,
         },
       ],
       chat_mensajes: [],
-    };
+    }));
 
-    const { data, error } = await supabase.from('traslados').insert([payload]).select().single();
+    const listaExtendida = listaBase.map((item) => ({
+      ...item,
+      ...condicionesObj,
+      condiciones_traslado: condicionesObj,
+    }));
+
+    let { data, error } = await supabase.from('traslados').insert(listaExtendida).select();
+    if (error) {
+      // Fallback automático si las columnas nuevas aún no fueron creadas con migracion_supabase.sql
+      const retry = await supabase.from('traslados').insert(listaBase).select();
+      data = retry.data;
+      error = retry.error;
+    }
+
     if (error) {
       alert('Error al guardar traslado en Supabase: ' + error.message);
       return;
     }
 
-    setTraslados([data, ...traslados]);
-    setViajeSeleccionadoId(data.id);
+    const insertados = (data || []).map((row) => ({
+      ...row,
+      ...condicionesObj,
+      condiciones_traslado: condicionesObj,
+    }));
+
+    setTraslados([...insertados, ...traslados]);
+    if (insertados[0]) setViajeSeleccionadoId(insertados[0].id);
     setNuevoViaje({
       ...nuevoViaje,
       paciente_nombre: '',
@@ -778,27 +1433,39 @@ export default function App() {
       numero_siniestro: '',
       origen_direccion: '',
       orden_adjunta_url: '',
+      condicion_paciente: 'AMBULATORIO',
+      lleva_acompanante: false,
+      acompanante_detalle: '',
+      lleva_silla_ruedas: false,
+      elemento_ortopedico: 'NINGUNO',
+      requiere_vehiculo_especial: false,
+      peso_paciente_kg: '',
+      tipo_vehiculo_especial: 'ESTANDAR',
+      observaciones_traslado: '',
     });
+    setEsRecurrente(false);
     setTabAdmin('TORRE');
   };
 
-  // Enviar link directo por WhatsApp al paciente
+  // Enviar link directo por WhatsApp al paciente (incluyendo condiciones autorizadas)
   const enviarWhatsAppPaciente = (t) => {
     const veh = vehiculos.find((v) => v.id === t.vehiculo_id);
     const urlSeguimiento = `${window.location.origin}/?token=${t.token_paciente}`;
     const telLimpio = (t.paciente_telefono || '').replace(/\D/g, '');
     const telArg = telLimpio.startsWith('54') ? telLimpio : `549${telLimpio}`;
+    const resumenCond = resumirCondicionesTexto(t);
     const mensaje = encodeURIComponent(
       `Hola ${t.paciente_nombre}, te saludamos de *Erquenci Traslados ART*.\n\n` +
-        `Tu traslado (${t.numero_siniestro}) hacia *${t.destino_nombre}* ya está asignado:\n` +
+        `Tu traslado (${t.numero_siniestro}) para el *${t.fecha_programada} a las ${t.hora_programada || ''} hs* hacia *${t.destino_nombre}* ya está asignado:\n` +
         `• *Chofer:* ${veh?.chofer_nombre || 'Asignado'}\n` +
-        `• *Vehículo:* ${veh?.modelo || ''} (Patente *${veh?.patente || ''}*)\n\n` +
+        `• *Vehículo:* ${veh?.modelo || ''} (Patente *${veh?.patente || ''}*)\n` +
+        `• *Condiciones autorizadas:* ${resumenCond}\n\n` +
         `Seguí el móvil en tiempo real por GPS desde este enlace seguro:\n${urlSeguimiento}`
     );
     window.open(`https://wa.me/${telArg}?text=${mensaje}`, '_blank');
   };
 
-  // Exportar planilla CSV para Excel de liquidación mensual ART
+  // Exportar planilla CSV para Excel de liquidación mensual ART (con columnas de condiciones)
   const exportarExcelLiquidacion = () => {
     const filtrados =
       filtroArtLiquidacion === 'TODAS'
@@ -807,10 +1474,17 @@ export default function App() {
 
     const encabezados = [
       'Fecha',
+      'Hora',
       'ART',
       'Siniestro',
       'Paciente',
       'DNI',
+      'Condicion Paciente',
+      'Acompanante',
+      'Silla de Ruedas / Ortopedia',
+      'Peso (kg)',
+      'Vehiculo Especial Requerido',
+      'Observaciones Clinicas',
       'Origen',
       'Destino',
       'Modalidad',
@@ -824,15 +1498,23 @@ export default function App() {
 
     const filas = filtrados.map((t) => {
       const veh = vehiculos.find((v) => v.id === t.vehiculo_id);
+      const cond = obtenerCondicionesTraslado(t);
       const kmFact = t.modalidad_viaje === 'IDA_VUELTA' ? (t.km_reales || 0) * 2 : t.km_reales || 0;
       return [
         t.fecha_programada,
+        t.hora_programada || '',
         t.art_nombre,
-        t.numero_siniestro,
-        `"${t.paciente_nombre}"`,
+        `"${t.numero_siniestro || ''}"`,
+        `"${t.paciente_nombre || ''}"`,
         t.paciente_dni,
-        `"${t.origen_direccion}"`,
-        `"${t.destino_nombre}"`,
+        `"${CONDICIONES_PACIENTE_LABELS[cond.condicion_paciente] || cond.condicion_paciente}"`,
+        `"${cond.lleva_acompanante ? `SI (${cond.acompanante_detalle || 'Autorizado'})` : 'NO'}"`,
+        `"${cond.lleva_silla_ruedas ? ELEMENTOS_ORTOPEDICOS_LABELS[cond.elemento_ortopedico] || 'SI' : 'NO'}"`,
+        cond.peso_paciente_kg || '',
+        `"${cond.requiere_vehiculo_especial ? TIPOS_VEHICULO_ESPECIAL_LABELS[cond.tipo_vehiculo_especial] || 'SI' : 'Estándar'}"`,
+        `"${(cond.observaciones_traslado || '').replace(/"/g, "'")}"`,
+        `"${t.origen_direccion || ''}"`,
+        `"${t.destino_nombre || ''}"`,
         t.modalidad_viaje,
         veh?.patente || '',
         `"${veh?.chofer_nombre || ''}"`,
@@ -852,47 +1534,76 @@ export default function App() {
     a.click();
   };
 
-  // PDF oficial auditado para ART
+  // PDF oficial auditado para ART (incluyendo bloque de condiciones clínicas del traslado)
   const descargarPdfLiquidacion = (t) => {
     const doc = new jsPDF();
     const veh = vehiculos.find((v) => v.id === t.vehiculo_id);
     const prest = prestadores.find((p) => p.id === t.prestador_id);
+    const cond = obtenerCondicionesTraslado(t);
     const kmFact = t.modalidad_viaje === 'IDA_VUELTA' ? (t.km_reales || 0) * 2 : t.km_reales || 0;
 
     doc.setFillColor(30, 88, 141);
     doc.rect(0, 0, 210, 32, 'F');
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(17);
+    doc.setFontSize(16);
     doc.text('ERQUENCI ART — COMPROBANTE DE TRASLADO AUDITADO', 14, 18);
     doc.setFontSize(10);
     doc.text(`Aseguradora: ${t.art_nombre} | Modalidad: ${t.modalidad_viaje}`, 14, 26);
 
     doc.setTextColor(30, 41, 59);
     doc.setFontSize(11);
-    doc.text(`N° Siniestro ART: ${t.numero_siniestro}`, 14, 44);
-    doc.text(`Fecha y Hora: ${t.fecha_programada} - ${t.hora_programada || ''} hs`, 14, 51);
-    doc.text(`Paciente: ${t.paciente_nombre} (DNI: ${t.paciente_dni})`, 14, 58);
-    doc.text(`Origen: ${t.origen_direccion}`, 14, 65);
-    doc.text(`Destino Médico: ${t.destino_nombre}`, 14, 72);
+    doc.text(`N° Siniestro ART: ${t.numero_siniestro}`, 14, 42);
+    doc.text(`Fecha y Hora: ${t.fecha_programada} - ${t.hora_programada || ''} hs`, 14, 49);
+    doc.text(`Paciente: ${t.paciente_nombre} (DNI: ${t.paciente_dni})`, 14, 56);
+    doc.text(`Origen: ${t.origen_direccion}`, 14, 63);
+    doc.text(`Destino Médico: ${t.destino_nombre}`, 14, 70);
 
-    doc.line(14, 78, 196, 78);
-    doc.text(`Prestador Ejecutor: ${prest?.razon_social || 'Erquenci'}`, 14, 86);
-    doc.text(`Móvil y Chofer: ${veh?.modelo || ''} (${veh?.patente || ''}) — ${veh?.chofer_nombre || ''}`, 14, 93);
-    doc.text(`Kilómetros Facturables: ${kmFact} km | Horas de Espera: ${t.horas_espera || 0} hs`, 14, 100);
+    // Bloque de Condiciones Clínicas y Operativas del Traslado
+    doc.setFillColor(241, 245, 249);
+    doc.rect(14, 75, 182, 26, 'F');
+    doc.setFontSize(9.5);
+    doc.setTextColor(30, 88, 141);
+    doc.text('CONDICIONES CLÍNICAS Y REQUERIMIENTOS DEL TRASLADO:', 17, 81);
+    doc.setTextColor(30, 41, 59);
+    doc.text(
+      `• Condición: ${CONDICIONES_PACIENTE_LABELS[cond.condicion_paciente] || cond.condicion_paciente} | Acompañante: ${
+        cond.lleva_acompanante ? `SÍ (${cond.acompanante_detalle || 'Autorizado'})` : 'NO'
+      }`,
+      17,
+      87
+    );
+    doc.text(
+      `• Silla de Ruedas / Ortopedia: ${
+        cond.lleva_silla_ruedas ? ELEMENTOS_ORTOPEDICOS_LABELS[cond.elemento_ortopedico] || 'SÍ' : 'NO'
+      } | Peso: ${cond.peso_paciente_kg ? `${cond.peso_paciente_kg} kg` : 'Estándar'} | Unidad: ${
+        TIPOS_VEHICULO_ESPECIAL_LABELS[cond.tipo_vehiculo_especial] || 'Estándar'
+      }`,
+      17,
+      93
+    );
+    if (cond.observaciones_traslado) {
+      doc.text(`• Observaciones: ${cond.observaciones_traslado.slice(0, 95)}`, 17, 99);
+    }
+
+    doc.line(14, 105, 196, 105);
+    doc.setFontSize(10.5);
+    doc.text(`Prestador Ejecutor: ${prest?.razon_social || 'Erquenci S.A.S.'}`, 14, 112);
+    doc.text(`Móvil y Chofer: ${veh?.modelo || ''} (${veh?.patente || ''}) — ${veh?.chofer_nombre || ''}`, 14, 119);
+    doc.text(`Kilómetros Facturables: ${kmFact} km | Horas de Espera: ${t.horas_espera || 0} hs`, 14, 126);
     doc.setFontSize(12);
-    doc.text(`IMPORTE LIQUIDACIÓN ART: $${(t.importe_total || 0).toLocaleString('es-AR')}`, 14, 108);
+    doc.text(`IMPORTE LIQUIDACIÓN ART: $${(t.importe_total || 0).toLocaleString('es-AR')}`, 14, 134);
 
     doc.setFontSize(10);
-    doc.text('Trazabilidad Horaria:', 14, 120);
+    doc.text('Trazabilidad Horaria:', 14, 144);
     (t.eventos || []).forEach((ev, idx) => {
-      doc.setFontSize(9);
-      doc.text(`• [${ev.hora}] ${ev.estado}: ${ev.detalle}`, 16, 127 + idx * 6);
+      doc.setFontSize(8.5);
+      doc.text(`• [${ev.hora}] ${ev.estado}: ${(ev.detalle || '').slice(0, 90)}`, 16, 150 + idx * 5.5);
     });
 
     if (t.firma_url) {
       doc.setFontSize(10);
-      doc.text('Conformidad Digital del Paciente:', 14, 165);
-      doc.addImage(t.firma_url, 'PNG', 14, 170, 70, 28);
+      doc.text('Conformidad Digital del Paciente:', 14, 185);
+      doc.addImage(t.firma_url, 'PNG', 14, 190, 70, 28);
     }
 
     doc.save(`Liquidacion_${t.art_nombre}_${t.numero_siniestro}.pdf`);
@@ -918,6 +1629,42 @@ export default function App() {
     setNuevoMensaje('');
     await supabase.from('traslados').update({ chat_mensajes: listaActualizada }).eq('id', viajeActivo.id);
   };
+
+  // Agrupación de Historial por Paciente (DNI / Nombre)
+  const historialPacientes = Object.values(
+    traslados.reduce((acc, t) => {
+      const clave = (t.paciente_dni || t.paciente_nombre || 'SIN-DNI').trim();
+      if (!acc[clave]) {
+        acc[clave] = {
+          clave,
+          paciente_nombre: t.paciente_nombre,
+          paciente_dni: t.paciente_dni,
+          paciente_telefono: t.paciente_telefono,
+          art_nombre: t.art_nombre,
+          ultimo_siniestro: t.numero_siniestro,
+          origen_direccion: t.origen_direccion,
+          ultimo_traslado: t,
+          viajes: [],
+          total_km: 0,
+          total_importe: 0,
+        };
+      }
+      const kmFact = t.modalidad_viaje === 'IDA_VUELTA' ? (t.km_reales || 0) * 2 : t.km_reales || 0;
+      acc[clave].viajes.push(t);
+      acc[clave].total_km = +(acc[clave].total_km + Number(kmFact)).toFixed(1);
+      acc[clave].total_importe += Number(t.importe_total || 0);
+      return acc;
+    }, {})
+  ).filter((p) => {
+    const q = busquedaHistorial.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      (p.paciente_nombre || '').toLowerCase().includes(q) ||
+      (p.paciente_dni || '').toLowerCase().includes(q) ||
+      (p.ultimo_siniestro || '').toLowerCase().includes(q) ||
+      (p.art_nombre || '').toLowerCase().includes(q)
+    );
+  });
 
   // PANTALLA DE LOGIN REAL
   if (!modoDemo && !session && !pacienteTokenUrl) {
@@ -987,7 +1734,6 @@ export default function App() {
             }
           />
 
-          {/* Selector visible solo en Modo Demo (oculto para pacientes con token o usuarios logueados reales) */}
           {modoDemo && !pacienteTokenUrl && (
             <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
               <button
@@ -1098,6 +1844,14 @@ export default function App() {
               <Plus className="w-4 h-4" /> Derivar Nuevo Traslado
             </button>
             <button
+              onClick={() => setTabAdmin('HISTORIAL')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 ${
+                tabAdmin === 'HISTORIAL' ? 'bg-[#1E588D] text-white' : 'bg-white text-slate-600 border border-slate-200'
+              }`}
+            >
+              <History className="w-4 h-4" /> Historial por Paciente ({historialPacientes.length})
+            </button>
+            <button
               onClick={() => setTabAdmin('LIQUIDACION')}
               className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 ${
                 tabAdmin === 'LIQUIDACION' ? 'bg-[#1E588D] text-white' : 'bg-white text-slate-600 border border-slate-200'
@@ -1123,25 +1877,141 @@ export default function App() {
             </button>
           </div>
 
-          {/* PESTAÑA 1: MONITOREO + RADAR GENERAL DE FLOTA */}
+          {/* PESTAÑA 1: MONITOREO + FILTROS + RADAR GENERAL DE FLOTA */}
           {tabAdmin === 'TORRE' && (
-            <div className="space-y-6">
-              <MapaGeneralFlota trasladosActivos={traslados} vehiculos={vehiculos} />
+            <div className="space-y-5">
+              <MapaGeneralFlota trasladosActivos={trasladosFiltradosTorre} vehiculos={vehiculos} />
+
+              {/* BARRA DE BUSCADOR Y FILTROS AVANZADOS */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <Filter className="w-3.5 h-3.5 text-[#1E588D]" />
+                    Filtros Operativos y Búsqueda Rápida ({trasladosFiltradosTorre.length} de {traslados.length} traslados)
+                  </span>
+                  {(busquedaTorre ||
+                    filtroArtTorre !== 'TODAS' ||
+                    filtroEstadoTorre !== 'TODOS' ||
+                    filtroFechaTorre ||
+                    filtroCondicionTorre !== 'TODAS') && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBusquedaTorre('');
+                        setFiltroArtTorre('TODAS');
+                        setFiltroEstadoTorre('TODOS');
+                        setFiltroFechaTorre('');
+                        setFiltroCondicionTorre('TODAS');
+                      }}
+                      className="text-xs font-semibold text-rose-600 hover:underline flex items-center gap-1"
+                    >
+                      <X className="w-3.5 h-3.5" /> Limpiar filtros
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 text-xs">
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      value={busquedaTorre}
+                      onChange={(e) => setBusquedaTorre(e.target.value)}
+                      placeholder="Buscar paciente, DNI, siniestro, patente..."
+                      className="w-full border border-slate-200 rounded-xl pl-8 pr-3 py-2 bg-slate-50 focus:bg-white outline-none"
+                    />
+                  </div>
+
+                  <select
+                    value={filtroArtTorre}
+                    onChange={(e) => setFiltroArtTorre(e.target.value)}
+                    className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 font-medium"
+                  >
+                    <option value="TODAS">Todas las ART</option>
+                    {tarifasArt.map((t) => (
+                      <option key={t.nombre_art} value={t.nombre_art}>
+                        {t.nombre_art}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={filtroEstadoTorre}
+                    onChange={(e) => setFiltroEstadoTorre(e.target.value)}
+                    className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 font-medium"
+                  >
+                    <option value="TODOS">Todos los Estados</option>
+                    <option value="EN_CURSO">⚡ Solo Activos / En Curso</option>
+                    <option value="ASIGNADO">Asignado</option>
+                    <option value="EN_CAMINO_DOMICILIO">En Camino a Domicilio</option>
+                    <option value="EN_DOMICILIO">En Puerta / Domicilio</option>
+                    <option value="PACIENTE_A_BORDO">Paciente a Bordo</option>
+                    <option value="FINALIZADO">Finalizado</option>
+                    <option value="ALERTA_DESPERFECTO">Alerta Desperfecto</option>
+                  </select>
+
+                  <select
+                    value={filtroCondicionTorre}
+                    onChange={(e) => setFiltroCondicionTorre(e.target.value)}
+                    className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 font-medium"
+                  >
+                    <option value="TODAS">Todas las Condiciones</option>
+                    <option value="CON_ACOMPANANTE">👥 Con Acompañante</option>
+                    <option value="CON_SILLA_RUEDAS">♿ Con Silla de Ruedas / Ortopedia</option>
+                    <option value="VEHICULO_ESPECIAL">⚖️ Vehículo Especial / +120-150 kg</option>
+                  </select>
+
+                  <div className="flex gap-1.5">
+                    <input
+                      type="date"
+                      value={filtroFechaTorre}
+                      onChange={(e) => setFiltroFechaTorre(e.target.value)}
+                      className="flex-1 border border-slate-200 rounded-xl px-2.5 py-2 bg-slate-50"
+                    />
+                    {filtroFechaTorre && (
+                      <button
+                        type="button"
+                        onClick={() => setFiltroFechaTorre('')}
+                        className="px-2.5 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-slate-600 font-bold"
+                        title="Ver todas las fechas"
+                      >
+                        Todas
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-4">
-                  {traslados.length === 0 ? (
+                  {trasladosFiltradosTorre.length === 0 ? (
                     <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-3">
-                      <p className="text-sm font-semibold text-slate-700">Todavía no hay traslados registrados en la base de datos.</p>
-                      <button
-                        onClick={() => setTabAdmin('NUEVO_VIAJE')}
-                        className="px-4 py-2 bg-[#34B37B] text-white text-xs font-bold rounded-xl"
-                      >
-                        + Crear Primer Traslado ART
-                      </button>
+                      <p className="text-sm font-semibold text-slate-700">
+                        No hay traslados que coincidan con los filtros seleccionados.
+                      </p>
+                      <div className="flex justify-center gap-2">
+                        <button
+                          onClick={() => {
+                            setBusquedaTorre('');
+                            setFiltroArtTorre('TODAS');
+                            setFiltroEstadoTorre('TODOS');
+                            setFiltroFechaTorre('');
+                            setFiltroCondicionTorre('TODAS');
+                          }}
+                          className="px-4 py-2 bg-slate-100 text-slate-700 text-xs font-bold rounded-xl"
+                        >
+                          Ver Todos
+                        </button>
+                        <button
+                          onClick={() => setTabAdmin('NUEVO_VIAJE')}
+                          className="px-4 py-2 bg-[#34B37B] text-white text-xs font-bold rounded-xl"
+                        >
+                          + Crear Nuevo Traslado ART
+                        </button>
+                      </div>
                     </div>
                   ) : (
-                    traslados.map((t) => {
+                    trasladosFiltradosTorre.map((t) => {
                       const veh = vehiculos.find((v) => v.id === t.vehiculo_id);
                       const esAlerta = t.estado === 'ALERTA_DESPERFECTO';
                       return (
@@ -1156,19 +2026,23 @@ export default function App() {
                               : 'border-slate-200 hover:border-slate-300'
                           }`}
                         >
-                          <div className="flex flex-wrap justify-between items-start gap-2 mb-3">
+                          <div className="flex flex-wrap justify-between items-start gap-2 mb-2.5">
                             <div>
-                              <div className="flex items-center gap-2">
+                              <div className="flex flex-wrap items-center gap-1.5">
                                 <span className="text-[11px] font-bold uppercase tracking-wider text-[#1E588D] bg-blue-50 px-2.5 py-0.5 rounded-full">
                                   {t.numero_siniestro}
                                 </span>
                                 <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full">
                                   {t.art_nombre}
                                 </span>
+                                <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                  <Calendar className="w-3 h-3" /> {t.fecha_programada} • {t.hora_programada || 'S/H'} hs
+                                </span>
                               </div>
-                              <h3 className="text-base font-bold text-slate-900 mt-1">{t.paciente_nombre}</h3>
+                              <h3 className="text-base font-bold text-slate-900 mt-1.5">{t.paciente_nombre}</h3>
                               <p className="text-xs text-slate-500">
-                                DNI: {t.paciente_dni} • Tel: {t.paciente_telefono} • <strong>${(t.importe_total || 0).toLocaleString('es-AR')}</strong>
+                                DNI: {t.paciente_dni} • Tel: {t.paciente_telefono} •{' '}
+                                <strong>${(t.importe_total || 0).toLocaleString('es-AR')}</strong>
                               </p>
                             </div>
                             <span
@@ -1182,6 +2056,11 @@ export default function App() {
                             >
                               {t.estado.replace(/_/g, ' ')}
                             </span>
+                          </div>
+
+                          {/* BADGES DE CONDICIÓN DEL TRASLADO (Acompañante, Silla de Ruedas, Peso 150 kg / Vehículo Especial) */}
+                          <div className="mb-3">
+                            <BadgesCondicionesTraslado traslado={t} mostrarObservaciones={true} />
                           </div>
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-600 bg-slate-50 p-3 rounded-xl mb-3">
@@ -1208,14 +2087,30 @@ export default function App() {
                               </div>
                             </div>
 
-                            <div className="flex flex-wrap items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={(e) => abrirModalEdicion(t, e)}
+                                className="px-2.5 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-blue-50 hover:text-[#1E588D] rounded-lg flex items-center gap-1"
+                                title="Editar traslado y condiciones"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" /> Editar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => repetirTrasladoPaciente(t, e)}
+                                className="px-2.5 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 rounded-lg flex items-center gap-1"
+                                title="Clonar / Repetir traslado para este paciente"
+                              >
+                                <Repeat className="w-3.5 h-3.5" /> Repetir
+                              </button>
                               <button
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   enviarWhatsAppPaciente(t);
                                 }}
-                                className="px-3 py-1.5 text-xs font-bold text-white bg-[#25D366] hover:bg-[#1ebe5d] rounded-lg flex items-center gap-1 shadow-sm"
+                                className="px-2.5 py-1.5 text-xs font-bold text-white bg-[#25D366] hover:bg-[#1ebe5d] rounded-lg flex items-center gap-1 shadow-sm"
                               >
                                 <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
                               </button>
@@ -1225,9 +2120,17 @@ export default function App() {
                                   e.stopPropagation();
                                   descargarPdfLiquidacion(t);
                                 }}
-                                className="px-3 py-1.5 text-xs font-semibold text-white bg-slate-800 hover:bg-slate-900 rounded-lg flex items-center gap-1"
+                                className="px-2.5 py-1.5 text-xs font-semibold text-white bg-slate-800 hover:bg-slate-900 rounded-lg flex items-center gap-1"
                               >
-                                <Download className="w-3.5 h-3.5" /> PDF ART
+                                <Download className="w-3.5 h-3.5" /> PDF
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => eliminarTraslado(t, e)}
+                                className="p-1.5 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg"
+                                title="Eliminar traslado"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             </div>
                           </div>
@@ -1237,13 +2140,33 @@ export default function App() {
                   )}
                 </div>
 
-                {/* PANEL DERECHO: AUDITORÍA + HORAS DE ESPERA + ORDEN MÉDICA */}
+                {/* PANEL DERECHO: AUDITORÍA + CONDICIONES + HORAS DE ESPERA + ORDEN MÉDICA */}
                 <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4 h-fit">
-                  <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-[#1E588D]" /> Auditoría y Liquidación del Viaje
-                  </h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-[#1E588D]" /> Auditoría y Ficha del Viaje
+                    </h3>
+                    {viajeActivo && (
+                      <button
+                        type="button"
+                        onClick={() => abrirModalEdicion(viajeActivo)}
+                        className="text-xs font-bold text-[#1E588D] hover:underline flex items-center gap-1"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" /> Editar
+                      </button>
+                    )}
+                  </div>
+
                   {viajeActivo ? (
                     <>
+                      {/* Ficha rápida de condiciones del paciente */}
+                      <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                        <div className="text-[11px] font-bold uppercase text-slate-500">
+                          Requerimientos del Paciente ({viajeActivo.paciente_nombre})
+                        </div>
+                        <BadgesCondicionesTraslado traslado={viajeActivo} mostrarObservaciones={true} />
+                      </div>
+
                       {/* Ajuste rápido de KM y Horas de Espera */}
                       <div className="p-3 bg-blue-50/60 border border-blue-100 rounded-xl space-y-2.5">
                         <div className="text-xs font-bold text-[#1E588D]">Parámetros de Facturación ({viajeActivo.art_nombre})</div>
@@ -1321,10 +2244,18 @@ export default function App() {
             </div>
           )}
 
-          {/* PESTAÑA 2: DERIVAR NUEVO TRASLADO */}
+          {/* PESTAÑA 2: DERIVAR NUEVO TRASLADO (CON CONDICIONES Y RECURRENCIA FKT) */}
           {tabAdmin === 'NUEVO_VIAJE' && (
-            <form onSubmit={crearNuevoTraslado} className="bg-white rounded-2xl border border-slate-200 p-6 max-w-2xl space-y-4">
-              <h3 className="font-bold text-base text-slate-900">Emitir Orden de Traslado ART</h3>
+            <form onSubmit={crearNuevoTraslado} className="bg-white rounded-2xl border border-slate-200 p-6 max-w-3xl space-y-5 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <div>
+                  <h3 className="font-bold text-base text-slate-900">Emitir Orden de Traslado ART</h3>
+                  <p className="text-xs text-slate-500">
+                    Completá los datos del paciente, condiciones clínicas (acompañante, silla de ruedas, peso/vehículo especial) y móvil.
+                  </p>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Aseguradora / ART</label>
@@ -1353,6 +2284,27 @@ export default function App() {
                 </div>
 
                 <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Fecha Programada</label>
+                  <input
+                    type="date"
+                    required
+                    value={nuevoViaje.fecha_programada}
+                    onChange={(e) => setNuevoViaje({ ...nuevoViaje, fecha_programada: e.target.value })}
+                    className="w-full border rounded-xl px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Hora de Retiro</label>
+                  <input
+                    type="time"
+                    required
+                    value={nuevoViaje.hora_programada}
+                    onChange={(e) => setNuevoViaje({ ...nuevoViaje, hora_programada: e.target.value })}
+                    className="w-full border rounded-xl px-3 py-2 text-sm"
+                  />
+                </div>
+
+                <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Nombre del Paciente</label>
                   <input required value={nuevoViaje.paciente_nombre} onChange={(e) => setNuevoViaje({ ...nuevoViaje, paciente_nombre: e.target.value })} className="w-full border rounded-xl px-3 py-2 text-sm" placeholder="Ej: Juan Pablo Sosa" />
                 </div>
@@ -1368,6 +2320,9 @@ export default function App() {
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Teléfono WhatsApp</label>
                   <input required value={nuevoViaje.paciente_telefono} onChange={(e) => setNuevoViaje({ ...nuevoViaje, paciente_telefono: e.target.value })} className="w-full border rounded-xl px-3 py-2 text-sm" placeholder="2604..." />
                 </div>
+
+                {/* BLOQUE DE CONDICIONES DEL TRASLADO (Acompañante, Silla de Ruedas, Peso 150 kg / Vehículo Especial) */}
+                <FormularioCondicionesTraslado state={nuevoViaje} onChange={setNuevoViaje} />
 
                 {/* Domicilio con Geocodificación real */}
                 <div className="sm:col-span-2 space-y-1">
@@ -1461,6 +2416,49 @@ export default function App() {
                   )}
                 </div>
 
+                {/* Programación Recurrente (Sesiones FKT / Rehabilitación) */}
+                <div className="sm:col-span-2 p-3.5 rounded-xl bg-blue-50/50 border border-blue-200 space-y-2.5">
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="text-xs font-bold text-[#1E588D] flex items-center gap-1.5">
+                      <Repeat className="w-4 h-4 text-[#34B37B]" />
+                      ¿Programar múltiples sesiones recurrentes (Rehabilitación / FKT)?
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={esRecurrente}
+                      onChange={(e) => setEsRecurrente(e.target.checked)}
+                      className="w-4 h-4 accent-[#1E588D] rounded"
+                    />
+                  </label>
+                  {esRecurrente && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-xs">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Cantidad de Sesiones a Generar</label>
+                        <input
+                          type="number"
+                          min="2"
+                          max="20"
+                          value={cantidadSesiones}
+                          onChange={(e) => setCantidadSesiones(e.target.value)}
+                          className="w-full border border-blue-200 rounded-lg px-2.5 py-1.5 bg-white font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Días de Cursado / Frecuencia</label>
+                        <select
+                          value={frecuenciaSesiones}
+                          onChange={(e) => setFrecuenciaSesiones(e.target.value)}
+                          className="w-full border border-blue-200 rounded-lg px-2.5 py-1.5 bg-white font-medium"
+                        >
+                          <option value="LUN_MIE_VIE">Lunes, Miércoles y Viernes</option>
+                          <option value="MAR_JUE">Martes y Jueves</option>
+                          <option value="DIARIO_HABIL">Todos los días hábiles (Lun a Vie)</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* Adjuntar Orden Médica / Autorización ART */}
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold text-slate-600 mb-1">
@@ -1486,37 +2484,188 @@ export default function App() {
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Asignar Móvil Habilitado</label>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                    Asignar Móvil Habilitado{' '}
+                    {(nuevoViaje.requiere_vehiculo_especial || nuevoViaje.lleva_silla_ruedas) && (
+                      <span className="text-rose-600 font-bold ml-1">
+                        (Requiere unidad apta para {nuevoViaje.lleva_silla_ruedas ? 'Silla de Ruedas ' : ''}
+                        {nuevoViaje.requiere_vehiculo_especial ? 'Peso / Vehículo Especial' : ''})
+                      </span>
+                    )}
+                  </label>
                   <select
                     value={nuevoViaje.vehiculo_id}
                     onChange={(e) => {
                       const v = vehiculos.find((item) => item.id === e.target.value);
                       setNuevoViaje({ ...nuevoViaje, vehiculo_id: e.target.value, prestador_id: v?.prestador_id || nuevoViaje.prestador_id });
                     }}
-                    className="w-full border rounded-xl px-3 py-2 text-sm"
+                    className="w-full border rounded-xl px-3 py-2 text-sm bg-white"
                   >
                     {vehiculos.map((v) => {
                       const bloqueado = vehiculoEstaBloqueado(v);
+                      const tagCapacidad =
+                        v.tipo_movilidad === 'AMPLIO_150KG_SILLA' || v.tipo_movilidad === 'UTILITARIO_ADAPTADO'
+                          ? '★ Apto Silla Ruedas / +150kg'
+                          : 'Estándar';
                       return (
                         <option key={v.id} value={v.id} disabled={bloqueado}>
                           {bloqueado ? '⛔ BLOQUEADO — ' : '✅ HABILITADO — '}
-                          {v.patente} | {v.modelo} | Chofer: {v.chofer_nombre}
+                          {v.patente} | {v.modelo} ({tagCapacidad}) | Chofer: {v.chofer_nombre}
                         </option>
                       );
                     })}
                   </select>
                 </div>
               </div>
+
               <button type="submit" className="px-5 py-2.5 bg-[#34B37B] hover:bg-[#2a9666] text-white font-bold rounded-xl text-sm shadow">
-                Confirmar y Guardar Traslado en Base de Datos
+                {esRecurrente
+                  ? `Confirmar y Generar ${cantidadSesiones} Traslados Recurrentes`
+                  : 'Confirmar y Guardar Traslado en Base de Datos'}
               </button>
             </form>
           )}
 
-          {/* PESTAÑA 3: LIQUIDACIÓN Y TARIFAS POR ART */}
+          {/* PESTAÑA 3: HISTORIAL CLÍNICO Y OPERATIVO POR PACIENTE */}
+          {tabAdmin === 'HISTORIAL' && (
+            <div className="space-y-4">
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                    <History className="w-4 h-4 text-[#1E588D]" />
+                    Historial Consolidado por Paciente ART
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Consultá todos los viajes realizados por cada paciente, sus condiciones de traslado habituales y repetí una orden en 1 clic.
+                  </p>
+                </div>
+                <div className="relative w-full sm:w-72">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    value={busquedaHistorial}
+                    onChange={(e) => setBusquedaHistorial(e.target.value)}
+                    placeholder="Buscar paciente por nombre, DNI o ART..."
+                    className="w-full border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-xs bg-slate-50 focus:bg-white outline-none"
+                  />
+                </div>
+              </div>
+
+              {historialPacientes.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-xs text-slate-500">
+                  No se encontraron pacientes registrados en el historial.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {historialPacientes.map((p) => {
+                    const abierto = pacienteHistorialExpandido === p.clave;
+                    return (
+                      <div key={p.clave} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                        <div className="p-4 flex flex-wrap items-center justify-between gap-4">
+                          <div className="space-y-1.5">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-sm font-extrabold text-slate-900">{p.paciente_nombre}</span>
+                              <span className="text-xs font-semibold text-slate-500">DNI: {p.paciente_dni}</span>
+                              <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full">
+                                {p.art_nombre}
+                              </span>
+                              <span className="text-[11px] font-bold text-[#1E588D] bg-blue-50 px-2.5 py-0.5 rounded-full">
+                                {p.ultimo_siniestro}
+                              </span>
+                            </div>
+                            <div className="text-xs text-slate-500">
+                              Domicilio habitual: <strong>{p.origen_direccion}</strong> • Tel: {p.paciente_telefono}
+                            </div>
+                            <BadgesCondicionesTraslado traslado={p.ultimo_traslado} mostrarObservaciones={true} />
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-3">
+                            <div className="text-right bg-slate-50 px-3 py-2 rounded-xl border border-slate-100">
+                              <div className="text-[10px] font-bold uppercase text-slate-400">
+                                {p.viajes.length} traslados • {p.total_km} km
+                              </div>
+                              <div className="text-sm font-extrabold text-[#1E588D]">
+                                ${p.total_importe.toLocaleString('es-AR')}
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => repetirTrasladoPaciente(p.ultimo_traslado)}
+                              className="px-3 py-2 bg-[#34B37B] hover:bg-[#2a9666] text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm"
+                            >
+                              <Repeat className="w-3.5 h-3.5" /> Nuevo Viaje
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPacienteHistorialExpandido(abierto ? null : p.clave)}
+                              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl"
+                            >
+                              {abierto ? 'Ocultar Viajes' : `Ver Historial (${p.viajes.length})`}
+                            </button>
+                          </div>
+                        </div>
+
+                        {abierto && (
+                          <div className="border-t border-slate-100 bg-slate-50/70 p-4 overflow-x-auto">
+                            <table className="w-full text-left text-xs border-collapse">
+                              <thead>
+                                <tr className="border-b border-slate-200 text-slate-500 uppercase text-[10px]">
+                                  <th className="py-2 px-2">Fecha / Hora</th>
+                                  <th className="py-2 px-2">Siniestro</th>
+                                  <th className="py-2 px-2">Destino</th>
+                                  <th className="py-2 px-2">Condición del Traslado</th>
+                                  <th className="py-2 px-2">Estado</th>
+                                  <th className="py-2 px-2 text-right">Importe</th>
+                                  <th className="py-2 px-2 text-right">Acciones</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-200/60">
+                                {p.viajes.map((v) => (
+                                  <tr key={v.id} className="hover:bg-white">
+                                    <td className="py-2 px-2 font-semibold">
+                                      {v.fecha_programada} • {v.hora_programada || ''} hs
+                                    </td>
+                                    <td className="py-2 px-2">{v.numero_siniestro}</td>
+                                    <td className="py-2 px-2">{v.destino_nombre}</td>
+                                    <td className="py-2 px-2 text-[11px] text-slate-600">{resumirCondicionesTexto(v)}</td>
+                                    <td className="py-2 px-2 font-bold text-[#1E588D]">{v.estado}</td>
+                                    <td className="py-2 px-2 text-right font-bold">
+                                      ${(v.importe_total || 0).toLocaleString('es-AR')}
+                                    </td>
+                                    <td className="py-2 px-2 text-right space-x-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => abrirModalEdicion(v)}
+                                        className="px-2 py-1 bg-white border rounded text-[11px] font-semibold text-slate-700 hover:text-[#1E588D]"
+                                      >
+                                        Editar
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => descargarPdfLiquidacion(v)}
+                                        className="px-2 py-1 bg-slate-800 text-white rounded text-[11px] font-semibold"
+                                      >
+                                        PDF
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* PESTAÑA 4: LIQUIDACIÓN Y TARIFAS POR ART */}
           {tabAdmin === 'LIQUIDACION' && (
             <div className="space-y-6">
-              {/* Cuadro tarifario editable por ART */}
               <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
                 <h3 className="font-bold text-sm text-slate-900">Cuadro Tarifario Vigente por Aseguradora (ART)</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
@@ -1563,7 +2712,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Resumen de facturación + Exportación Excel */}
               <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
@@ -1605,6 +2753,7 @@ export default function App() {
                         <th className="py-2.5 px-2">Fecha</th>
                         <th className="py-2.5 px-2">ART</th>
                         <th className="py-2.5 px-2">Siniestro / Paciente</th>
+                        <th className="py-2.5 px-2">Condiciones Especiales</th>
                         <th className="py-2.5 px-2">Modalidad</th>
                         <th className="py-2.5 px-2">KM / Espera</th>
                         <th className="py-2.5 px-2">Estado</th>
@@ -1621,6 +2770,9 @@ export default function App() {
                             <td className="py-2.5 px-2">
                               <div className="font-bold text-slate-800">{t.paciente_nombre}</div>
                               <div className="text-[11px] text-slate-500">{t.numero_siniestro}</div>
+                            </td>
+                            <td className="py-2.5 px-2">
+                              <BadgesCondicionesTraslado traslado={t} />
                             </td>
                             <td className="py-2.5 px-2">{t.modalidad_viaje === 'IDA_VUELTA' ? 'Ida y Vuelta' : 'Solo Ida'}</td>
                             <td className="py-2.5 px-2">
@@ -1640,7 +2792,7 @@ export default function App() {
             </div>
           )}
 
-          {/* PESTAÑA 4: FLOTA Y VENCIMIENTOS */}
+          {/* PESTAÑA 5: FLOTA Y VENCIMIENTOS */}
           {tabAdmin === 'FLOTA' && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1659,6 +2811,9 @@ export default function App() {
                       <div>
                         <h4 className="font-bold text-slate-900 text-sm">{v.modelo}</h4>
                         <p className="text-xs text-slate-500">{prest?.razon_social}</p>
+                        <span className="inline-block mt-1 px-2 py-0.5 rounded-md bg-blue-50 text-[#1E588D] text-[10px] font-bold">
+                          Categoría: {v.tipo_movilidad === 'AMPLIO_150KG_SILLA' ? 'Amplio (+150 kg / Silla de Ruedas)' : v.tipo_movilidad === 'UTILITARIO_ADAPTADO' ? 'Utilitario / Rampa Especial' : 'Ambulatorio Estándar'}
+                        </span>
                       </div>
 
                       <div className="flex items-center justify-between gap-2.5 pt-2 border-t border-slate-100">
@@ -1742,7 +2897,7 @@ export default function App() {
                 }}
                 className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4"
               >
-                <h4 className="font-bold text-sm text-slate-900">Registrar Nuevo Móvil, Foto de Chofer y Vencimientos Legales</h4>
+                <h4 className="font-bold text-sm text-slate-900">Registrar Nuevo Móvil, Capacidad Especial y Vencimientos Legales</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                   <select value={nuevoVehiculo.prestador_id} onChange={(e) => setNuevoVehiculo({ ...nuevoVehiculo, prestador_id: e.target.value })} className="border rounded-xl px-3 py-2">
                     {prestadores.map((p) => <option key={p.id} value={p.id}>{p.razon_social}</option>)}
@@ -1751,7 +2906,17 @@ export default function App() {
                   <input required placeholder="Modelo vehículo" value={nuevoVehiculo.modelo} onChange={(e) => setNuevoVehiculo({ ...nuevoVehiculo, modelo: e.target.value })} className="border rounded-xl px-3 py-2" />
                   <input required placeholder="Nombre del Chofer" value={nuevoVehiculo.chofer_nombre} onChange={(e) => setNuevoVehiculo({ ...nuevoVehiculo, chofer_nombre: e.target.value })} className="border rounded-xl px-3 py-2" />
 
-                  <div className="sm:col-span-2 flex items-center gap-3 border rounded-xl px-3 py-1.5 bg-slate-50">
+                  <select
+                    value={nuevoVehiculo.tipo_movilidad}
+                    onChange={(e) => setNuevoVehiculo({ ...nuevoVehiculo, tipo_movilidad: e.target.value })}
+                    className="border rounded-xl px-3 py-2 bg-white font-semibold text-[#1E588D]"
+                  >
+                    <option value="AMPLIO_150KG_SILLA">Sedán Amplio (Apto +150 kg y Silla en Baúl)</option>
+                    <option value="UTILITARIO_ADAPTADO">Utilitario / SUV Adaptado (Silla Ruedas / Rampa)</option>
+                    <option value="AMBULATORIO">Ambulatorio Estándar</option>
+                  </select>
+
+                  <div className="flex items-center gap-3 border rounded-xl px-3 py-1.5 bg-slate-50">
                     {nuevoVehiculo.chofer_foto ? (
                       <img src={nuevoVehiculo.chofer_foto} alt="Vista previa" className="w-8 h-8 rounded-full object-cover border" />
                     ) : (
@@ -1803,7 +2968,7 @@ export default function App() {
             </div>
           )}
 
-          {/* PESTAÑA 5: PRESTADORES */}
+          {/* PESTAÑA 6: PRESTADORES */}
           {tabAdmin === 'PRESTADORES' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-3">
@@ -1847,6 +3012,196 @@ export default function App() {
             </div>
           )}
         </main>
+      )}
+
+      {/* ==================================================================== */}
+      {/* MODAL DE EDICIÓN COMPLETA DE TRASLADO Y CONDICIONES                  */}
+      {/* ==================================================================== */}
+      {trasladoEditando && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 space-y-4 my-8 max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div>
+                <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
+                  <Edit3 className="w-4 h-4 text-[#1E588D]" /> Editar Traslado y Condiciones Clínicas
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Siniestro: {trasladoEditando.numero_siniestro} • Paciente: {trasladoEditando.paciente_nombre}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTrasladoEditando(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={guardarEdicionTraslado} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div>
+                  <label className="block font-semibold text-slate-600 mb-1">Aseguradora / ART</label>
+                  <select
+                    value={trasladoEditando.art_nombre}
+                    onChange={(e) => setTrasladoEditando({ ...trasladoEditando, art_nombre: e.target.value })}
+                    className="w-full border rounded-xl px-3 py-2 bg-white"
+                  >
+                    {tarifasArt.map((t) => (
+                      <option key={t.nombre_art} value={t.nombre_art}>
+                        {t.nombre_art}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-600 mb-1">Estado del Traslado</label>
+                  <select
+                    value={trasladoEditando.estado}
+                    onChange={(e) => setTrasladoEditando({ ...trasladoEditando, estado: e.target.value })}
+                    className="w-full border rounded-xl px-3 py-2 bg-white font-bold text-[#1E588D]"
+                  >
+                    <option value="ASIGNADO">ASIGNADO</option>
+                    <option value="EN_CAMINO_DOMICILIO">EN CAMINO A DOMICILIO</option>
+                    <option value="EN_DOMICILIO">EN DOMICILIO</option>
+                    <option value="PACIENTE_A_BORDO">PACIENTE A BORDO</option>
+                    <option value="FINALIZADO">FINALIZADO</option>
+                    <option value="ALERTA_DESPERFECTO">ALERTA DESPERFECTO</option>
+                    <option value="CANCELADO">CANCELADO</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-600 mb-1">Paciente</label>
+                  <input
+                    required
+                    value={trasladoEditando.paciente_nombre}
+                    onChange={(e) => setTrasladoEditando({ ...trasladoEditando, paciente_nombre: e.target.value })}
+                    className="w-full border rounded-xl px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-600 mb-1">DNI</label>
+                  <input
+                    required
+                    value={trasladoEditando.paciente_dni}
+                    onChange={(e) => setTrasladoEditando({ ...trasladoEditando, paciente_dni: e.target.value })}
+                    className="w-full border rounded-xl px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-600 mb-1">N° Siniestro</label>
+                  <input
+                    required
+                    value={trasladoEditando.numero_siniestro}
+                    onChange={(e) => setTrasladoEditando({ ...trasladoEditando, numero_siniestro: e.target.value })}
+                    className="w-full border rounded-xl px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-600 mb-1">Teléfono WhatsApp</label>
+                  <input
+                    required
+                    value={trasladoEditando.paciente_telefono}
+                    onChange={(e) => setTrasladoEditando({ ...trasladoEditando, paciente_telefono: e.target.value })}
+                    className="w-full border rounded-xl px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-600 mb-1">Fecha Programada</label>
+                  <input
+                    type="date"
+                    value={trasladoEditando.fecha_programada}
+                    onChange={(e) => setTrasladoEditando({ ...trasladoEditando, fecha_programada: e.target.value })}
+                    className="w-full border rounded-xl px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-600 mb-1">Hora Programada</label>
+                  <input
+                    type="time"
+                    value={trasladoEditando.hora_programada || '11:30'}
+                    onChange={(e) => setTrasladoEditando({ ...trasladoEditando, hora_programada: e.target.value })}
+                    className="w-full border rounded-xl px-3 py-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-600 mb-1">Domicilio Origen</label>
+                  <input
+                    required
+                    value={trasladoEditando.origen_direccion}
+                    onChange={(e) => setTrasladoEditando({ ...trasladoEditando, origen_direccion: e.target.value })}
+                    className="w-full border rounded-xl px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-600 mb-1">Centro Médico Destino</label>
+                  <input
+                    required
+                    value={trasladoEditando.destino_nombre}
+                    onChange={(e) => setTrasladoEditando({ ...trasladoEditando, destino_nombre: e.target.value })}
+                    className="w-full border rounded-xl px-3 py-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-600 mb-1">Modalidad</label>
+                  <select
+                    value={trasladoEditando.modalidad_viaje}
+                    onChange={(e) => setTrasladoEditando({ ...trasladoEditando, modalidad_viaje: e.target.value })}
+                    className="w-full border rounded-xl px-3 py-2 bg-white"
+                  >
+                    <option value="IDA_VUELTA">Ida y Vuelta</option>
+                    <option value="SOLO_IDA">Solo Ida</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-600 mb-1">Móvil Asignado</label>
+                  <select
+                    value={trasladoEditando.vehiculo_id}
+                    onChange={(e) => {
+                      const v = vehiculos.find((item) => item.id === e.target.value);
+                      setTrasladoEditando({
+                        ...trasladoEditando,
+                        vehiculo_id: e.target.value,
+                        prestador_id: v?.prestador_id || trasladoEditando.prestador_id,
+                      });
+                    }}
+                    className="w-full border rounded-xl px-3 py-2 bg-white"
+                  >
+                    {vehiculos.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.patente} — {v.modelo} ({v.chofer_nombre})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Condiciones Clínicas en Modal de Edición */}
+                <FormularioCondicionesTraslado state={trasladoEditando} onChange={setTrasladoEditando} />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setTrasladoEditando(null)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 rounded-xl"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 text-xs font-bold text-white bg-[#1E588D] hover:bg-[#16436b] rounded-xl flex items-center gap-1.5 shadow"
+                >
+                  <Check className="w-4 h-4" /> Guardar Cambios
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {/* ==================================================================== */}
@@ -1898,6 +3253,15 @@ export default function App() {
                   <a href={`tel:${viajeActivo.paciente_telefono}`} className="p-2.5 bg-emerald-50 text-[#34B37B] rounded-full">
                     <Phone className="w-5 h-5" />
                   </a>
+                </div>
+
+                {/* ALERTA DE CONDICIONES ESPECIALES PARA EL CHOFER */}
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                  <div className="text-[11px] font-extrabold uppercase text-[#1E588D] flex items-center gap-1.5">
+                    <Accessibility className="w-4 h-4 text-[#34B37B]" />
+                    Condiciones del Traslado a Preparar en el Móvil:
+                  </div>
+                  <BadgesCondicionesTraslado traslado={viajeActivo} mostrarObservaciones={true} />
                 </div>
 
                 <div className="space-y-2 bg-slate-50 p-3.5 rounded-xl text-xs">
@@ -2050,9 +3414,13 @@ export default function App() {
                     </a>
                   </div>
 
-                  <div className="bg-slate-50 p-3.5 rounded-xl text-xs space-y-1.5 text-slate-700">
+                  <div className="bg-slate-50 p-3.5 rounded-xl text-xs space-y-2 text-slate-700">
                     <div><strong>Punto de retiro:</strong> {viajeActivo.origen_direccion}</div>
                     <div><strong>Destino médico:</strong> {viajeActivo.destino_nombre}</div>
+                    <div className="pt-1.5 border-t border-slate-200">
+                      <div className="text-[11px] font-bold text-slate-500 mb-1">Condiciones Autorizadas para tu Viaje:</div>
+                      <BadgesCondicionesTraslado traslado={viajeActivo} mostrarObservaciones={true} />
+                    </div>
                   </div>
                 </div>
               </div>
