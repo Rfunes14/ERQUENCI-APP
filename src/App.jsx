@@ -697,8 +697,10 @@ const MapaSeguimientoGps = ({
     <div className="relative w-full h-56 rounded-xl overflow-hidden border border-slate-200 z-10">
       <div ref={mapContainerRef} className="w-full h-full" />
       <div className="absolute bottom-2 left-2 z-[500] bg-white/95 backdrop-blur px-2.5 py-1 rounded-lg shadow text-[10px] font-bold text-slate-700 flex items-center gap-1.5">
-        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-        GPS Satelital Activo • San Rafael
+        <span className={`w-2 h-2 rounded-full animate-ping ${coordsReales?.lat ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+        {coordsReales?.lat
+          ? '📡 GPS Real del Chofer en Vivo • Tiempo Real'
+          : 'GPS Estimado de Ruta • Esperando señal del chofer'}
       </div>
     </div>
   );
@@ -710,67 +712,96 @@ const MapaSeguimientoGps = ({
 const MapaGeneralFlota = ({ trasladosActivos, vehiculos, obtenerNombreChofer }) => {
   const mapRef = useRef(null);
   const instanceRef = useRef(null);
+  const markersRef = useRef({});
 
+  // Inicializar el mapa una sola vez para no perder zoom ni parpadear con el GPS en vivo
   useEffect(() => {
-    if (!mapRef.current || !window.L) return;
+    if (!mapRef.current || !window.L || instanceRef.current) return;
     const L = window.L;
-
-    if (instanceRef.current) {
-      instanceRef.current.remove();
-    }
-
     const map = L.map(mapRef.current, {
       center: [-34.6177, -68.3301],
       zoom: 12,
     });
-
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap',
     }).addTo(map);
-
-    trasladosActivos.forEach((t) => {
-      const veh = vehiculos.find((v) => v.id === t.vehiculo_id);
-      const nombreChofer = obtenerNombreChofer ? obtenerNombreChofer(t) : veh?.chofer_nombre || '';
-      const cond = obtenerMetaTraslado(t);
-      const orig = t.origen_lat && t.origen_lng ? [t.origen_lat, t.origen_lng] : [-34.6245, -68.3480];
-      const dest = t.destino_lat && t.destino_lng ? [t.destino_lat, t.destino_lng] : [-34.6152, -68.3342];
-      const factor = Math.min(100, Math.max(0, t.gps_progreso || 20)) / 100;
-      const pos = t.coords_reales?.lat
-        ? [t.coords_reales.lat, t.coords_reales.lng]
-        : [orig[0] + (dest[0] - orig[0]) * factor, orig[1] + (dest[1] - orig[1]) * factor];
-
-      const badgeExtra = cond.lleva_silla_ruedas ? ' ♿' : cond.requiere_vehiculo_especial ? ' ⭐' : '';
-      const icon = L.divIcon({
-        className: 'fleet-pin',
-        html: `<div style="background:${t.estado === 'ALERTA_DESPERFECTO' ? '#dc2626' : '#1E588D'};color:white;padding:3px 8px;border-radius:999px;font-weight:800;font-size:10px;border:2px solid #34B37B;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.3);">🚕 ${veh?.patente || 'Móvil'} • ${(t.paciente_nombre || '').split(',')[0]}${badgeExtra}</div>`,
-        iconSize: [130, 24],
-        iconAnchor: [65, 12],
-      });
-
-      L.marker(pos, { icon })
-        .addTo(map)
-        .bindPopup(
-          `<b>${veh?.patente || 'Unidad'}</b> (${nombreChofer})<br/>Paciente: ${t.paciente_nombre}<br/>Hora: ${t.hora_programada} hs<br/>Condición: ${resumirCondicionesTexto(t)}<br/>Destino: ${t.destino_nombre}`
-        );
-    });
-
     instanceRef.current = map;
 
     return () => {
       if (instanceRef.current) {
         instanceRef.current.remove();
         instanceRef.current = null;
+        markersRef.current = {};
       }
     };
+  }, []);
+
+  // Actualizar posiciones y estados de cada unidad en tiempo real sin reconstruir el mapa
+  useEffect(() => {
+    if (!instanceRef.current || !window.L) return;
+    const L = window.L;
+    const map = instanceRef.current;
+    const idsPresentes = new Set();
+
+    trasladosActivos.forEach((t) => {
+      const idStr = String(t.id);
+      idsPresentes.add(idStr);
+      const veh = vehiculos.find((v) => v.id === t.vehiculo_id);
+      const nombreChofer = obtenerNombreChofer ? obtenerNombreChofer(t) : veh?.chofer_nombre || '';
+      const cond = obtenerMetaTraslado(t);
+      const orig = t.origen_lat && t.origen_lng ? [t.origen_lat, t.origen_lng] : [-34.6245, -68.3480];
+      const dest = t.destino_lat && t.destino_lng ? [t.destino_lat, t.destino_lng] : [-34.6152, -68.3342];
+      const factor = Math.min(100, Math.max(0, t.gps_progreso || 20)) / 100;
+      const tieneGpsReal = Boolean(t.coords_reales?.lat && t.coords_reales?.lng);
+      const pos = tieneGpsReal
+        ? [t.coords_reales.lat, t.coords_reales.lng]
+        : [orig[0] + (dest[0] - orig[0]) * factor, orig[1] + (dest[1] - orig[1]) * factor];
+
+      const badgeExtra = cond.lleva_silla_ruedas ? ' ♿' : cond.requiere_vehiculo_especial ? ' ⭐' : '';
+      const badgeGps = tieneGpsReal ? '📡 ' : '🚕 ';
+      const bg = t.estado === 'ALERTA_DESPERFECTO' ? '#dc2626' : tieneGpsReal ? '#0f766e' : '#1E588D';
+      const icon = L.divIcon({
+        className: 'fleet-pin',
+        html: `<div style="background:${bg};color:white;padding:3px 8px;border-radius:999px;font-weight:800;font-size:10px;border:2px solid #34B37B;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.3);">${badgeGps}${veh?.patente || 'Móvil'} • ${(t.paciente_nombre || '').split(',')[0]}${badgeExtra}</div>`,
+        iconSize: [135, 24],
+        iconAnchor: [67, 12],
+      });
+      const popupHtml = `<b>${veh?.patente || 'Unidad'}</b> (${nombreChofer})<br/>${tieneGpsReal ? '<span style="color:#059669;font-weight:bold;">📡 GPS Real del Chofer</span>' : 'Ruta estimada'}<br/>Paciente: ${t.paciente_nombre}<br/>Hora: ${t.hora_programada} hs<br/>Estado: ${t.estado}<br/>Destino: ${t.destino_nombre}`;
+
+      if (markersRef.current[idStr]) {
+        markersRef.current[idStr].setLatLng(pos);
+        markersRef.current[idStr].setIcon(icon);
+        markersRef.current[idStr].setPopupContent(popupHtml);
+      } else {
+        markersRef.current[idStr] = L.marker(pos, { icon }).addTo(map).bindPopup(popupHtml);
+      }
+    });
+
+    Object.keys(markersRef.current).forEach((idKey) => {
+      if (!idsPresentes.has(idKey)) {
+        map.removeLayer(markersRef.current[idKey]);
+        delete markersRef.current[idKey];
+      }
+    });
   }, [trasladosActivos, vehiculos]);
+
+  const cantidadGpsReal = trasladosActivos.filter((t) => t.coords_reales?.lat).length;
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-      <div className="px-4 py-2.5 bg-slate-900 text-white flex justify-between items-center text-xs">
+      <div className="px-4 py-2.5 bg-slate-900 text-white flex flex-wrap justify-between items-center gap-2 text-xs">
         <span className="font-bold flex items-center gap-2">
           <Navigation className="w-4 h-4 text-[#34B37B]" /> Radar Satelital de Flota en Tiempo Real (San Rafael y Distritos)
         </span>
-        <span className="text-[11px] text-slate-300">{trasladosActivos.length} traslados en vista</span>
+        <div className="flex items-center gap-3 text-[11px] text-slate-300">
+          {cantidadGpsReal > 0 && (
+            <span className="text-emerald-300 font-bold flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              {cantidadGpsReal} con GPS real en vivo
+            </span>
+          )}
+          <span>{trasladosActivos.length} traslados en vista</span>
+        </div>
       </div>
       <div ref={mapRef} className="w-full h-64 z-10" />
     </div>
@@ -1271,7 +1302,12 @@ export default function App() {
   const [modalDesperfecto, setModalDesperfecto] = useState(false);
   const [textoFalla, setTextoFalla] = useState('');
   const [gpsRealActivo, setGpsRealActivo] = useState(false);
+  const [ultimaSyncVivo, setUltimaSyncVivo] = useState('');
   const [buscandoGeo, setBuscandoGeo] = useState(false);
+  const liveChannelRef = useRef(null);
+  const gpsWatchIdRef = useRef(null);
+  const ultimoEnvioGpsRef = useRef(0);
+  const viajeActivoIdRef = useRef(null);
   const [linkCopiadoMsg, setLinkCopiadoMsg] = useState('');
   const [guardandoHojaReal, setGuardandoHojaReal] = useState(false);
 
@@ -1694,6 +1730,49 @@ export default function App() {
     }
   };
 
+  // Fusión silenciosa de cambios de traslados (sin parpadeo ni spinner)
+  const aplicarCambioTrasladoEnEstado = (registro) => {
+    if (!registro || !registro.id) return;
+    setTraslados((prev) => {
+      const existe = prev.some((t) => String(t.id) === String(registro.id));
+      if (existe) {
+        return prev.map((t) => (String(t.id) === String(registro.id) ? { ...t, ...registro } : t));
+      }
+      return [registro, ...prev];
+    });
+    setUltimaSyncVivo(new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+  };
+
+  // Emitir evento instantáneo por Supabase Broadcast (<100ms entre Central, Chofer y Paciente)
+  const emitirCambioEnVivo = (id, patch) => {
+    if (liveChannelRef.current) {
+      liveChannelRef.current.send({
+        type: 'broadcast',
+        event: 'traslado_sync',
+        payload: { id, ...patch },
+      });
+    }
+  };
+
+  // Sincronización silenciosa de respaldo cada 3.5 segundos (ideal si falla el WebSocket en 4G)
+  const sincronizarTrasladosSilencioso = async () => {
+    try {
+      const { data } = await supabase.from('traslados').select('*').order('created_at', { ascending: false });
+      if (data && data.length > 0) {
+        setTraslados((prev) => {
+          const dnisEnDb = new Set(data.map((t) => String(t.paciente_dni).trim()));
+          const localesPendientes = prev.filter(
+            (r) => String(r.id).startsWith('real-') && !dnisEnDb.has(String(r.paciente_dni).trim())
+          );
+          return [...localesPendientes, ...data];
+        });
+        setUltimaSyncVivo(new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      }
+    } catch (e) {
+      console.warn('Sync silencioso:', e);
+    }
+  };
+
   useEffect(() => {
     cargarDatosDesdeSupabase();
 
@@ -1708,16 +1787,42 @@ export default function App() {
       if (session) setModoDemo(false);
     });
 
-    const channel = supabase
+    // Canal 1: Postgres Changes (BD -> todos los clientes)
+    const dbChannel = supabase
       .channel('traslados-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'traslados' }, () => {
-        cargarDatosDesdeSupabase();
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'traslados' }, (payload) => {
+        if (payload.eventType === 'DELETE' && payload.old?.id) {
+          setTraslados((prev) => prev.filter((t) => String(t.id) !== String(payload.old.id)));
+        } else if (payload.new) {
+          aplicarCambioTrasladoEnEstado(payload.new);
+        } else {
+          sincronizarTrasladosSilencioso();
+        }
       })
       .subscribe();
 
+    // Canal 2: Broadcast instantáneo (GPS en vivo, chat, firma y estados sin esperar refresh)
+    const liveChannel = supabase
+      .channel('erquenci-live-sync', { config: { broadcast: { self: false } } })
+      .on('broadcast', { event: 'traslado_sync' }, ({ payload }) => {
+        aplicarCambioTrasladoEnEstado(payload);
+      })
+      .subscribe();
+    liveChannelRef.current = liveChannel;
+
+    // Respaldo automático cada 3.5s
+    const pollInterval = setInterval(() => {
+      sincronizarTrasladosSilencioso();
+    }, 3500);
+
     return () => {
       subscription.unsubscribe();
-      supabase.removeChannel(channel);
+      supabase.removeChannel(dbChannel);
+      supabase.removeChannel(liveChannel);
+      clearInterval(pollInterval);
+      if (gpsWatchIdRef.current !== null && navigator.geolocation) {
+        navigator.geolocation.clearWatch(gpsWatchIdRef.current);
+      }
     };
   }, []);
 
@@ -1748,20 +1853,53 @@ export default function App() {
     setTimeout(() => setLinkCopiadoMsg(''), 4500);
   };
 
-  const activarGpsRealDispositivo = () => {
-    if (!navigator.geolocation || !viajeActivo) {
-      alert('Tu navegador no soporta geolocalización GPS.');
+  const detenerGpsRealDispositivo = () => {
+    if (gpsWatchIdRef.current !== null && navigator.geolocation) {
+      navigator.geolocation.clearWatch(gpsWatchIdRef.current);
+      gpsWatchIdRef.current = null;
+    }
+    setGpsRealActivo(false);
+  };
+
+  const activarGpsRealDispositivo = (silencioso = false) => {
+    if (!navigator.geolocation) {
+      if (!silencioso) alert('Tu navegador no soporta geolocalización GPS.');
+      return;
+    }
+    if (gpsWatchIdRef.current !== null) {
+      setGpsRealActivo(true);
       return;
     }
     setGpsRealActivo(true);
-    navigator.geolocation.watchPosition(
+    gpsWatchIdRef.current = navigator.geolocation.watchPosition(
       async (pos) => {
-        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setTraslados((prev) => prev.map((t) => (t.id === viajeActivo.id ? { ...t, coords_reales: coords } : t)));
-        await supabase.from('traslados').update({ coords_reales: coords }).eq('id', viajeActivo.id);
+        const idActual = viajeActivoIdRef.current;
+        if (!idActual) return;
+        const ahoraMs = Date.now();
+        if (ahoraMs - ultimoEnvioGpsRef.current < 2500) return;
+        ultimoEnvioGpsRef.current = ahoraMs;
+
+        const coords = {
+          lat: +pos.coords.latitude.toFixed(6),
+          lng: +pos.coords.longitude.toFixed(6),
+          ts: ahoraMs,
+        };
+
+        setTraslados((prev) =>
+          prev.map((t) => (t.id === idActual ? { ...t, coords_reales: coords } : t))
+        );
+        emitirCambioEnVivo(idActual, { coords_reales: coords });
+
+        if (!String(idActual).startsWith('real-')) {
+          await supabase.from('traslados').update({ coords_reales: coords }).eq('id', idActual);
+        }
       },
-      () => setGpsRealActivo(false),
-      { enableHighAccuracy: true, maximumAge: 5000 }
+      (err) => {
+        console.warn('Error GPS:', err);
+        setGpsRealActivo(false);
+        gpsWatchIdRef.current = null;
+      },
+      { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
     );
   };
 
@@ -1944,6 +2082,7 @@ export default function App() {
     trasladosFiltradosTorre[0] ||
     traslados[0];
 
+  viajeActivoIdRef.current = viajeActivo?.id || null;
   const vehiculoAsignado = vehiculos.find((v) => v.id === viajeActivo?.vehiculo_id) || vehiculos[0];
   const choferAsignadoViaje = obtenerChoferDeTraslado(viajeActivo);
   const prestadorAsignado = prestadores.find((p) => p.id === viajeActivo?.prestador_id) || prestadores[0];
@@ -1964,6 +2103,16 @@ export default function App() {
     };
 
     setTraslados((prev) => prev.map((t) => (t.id === id ? { ...t, ...actualizacion } : t)));
+    emitirCambioEnVivo(id, actualizacion);
+
+    if (
+      rolActivo === 'CHOFER' &&
+      ['EN_CAMINO_DOMICILIO', 'EN_DOMICILIO', 'PACIENTE_A_BORDO'].includes(nuevoEstado) &&
+      !gpsRealActivo
+    ) {
+      activarGpsRealDispositivo(true);
+    }
+
     if (!String(id).startsWith('real-')) {
       await supabase.from('traslados').update(actualizacion).eq('id', id);
     }
@@ -2627,6 +2776,7 @@ export default function App() {
     setTraslados((prev) =>
       prev.map((t) => (t.id === viajeActivo.id ? { ...t, chat_mensajes: listaActualizada } : t))
     );
+    emitirCambioEnVivo(viajeActivo.id, { chat_mensajes: listaActualizada });
     setNuevoMensaje('');
     if (!String(viajeActivo.id).startsWith('real-')) {
       await supabase.from('traslados').update({ chat_mensajes: listaActualizada }).eq('id', viajeActivo.id);
@@ -5680,12 +5830,12 @@ export default function App() {
                 </div>
                 <div className="flex items-center gap-1.5">
                   <button
-                    onClick={activarGpsRealDispositivo}
+                    onClick={() => (gpsRealActivo ? detenerGpsRealDispositivo() : activarGpsRealDispositivo(false))}
                     className={`px-2.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1 border ${
-                      gpsRealActivo ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-slate-50 text-slate-700 border-slate-200'
+                      gpsRealActivo ? 'bg-emerald-600 text-white border-emerald-700 animate-pulse' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-emerald-50'
                     }`}
                   >
-                    <Navigation className="w-3.5 h-3.5" /> {gpsRealActivo ? 'GPS Vivo' : 'Usar GPS'}
+                    <Navigation className="w-3.5 h-3.5" /> {gpsRealActivo ? '📡 GPS En Vivo' : 'Activar GPS'}
                   </button>
                   <button
                     onClick={() => setModalDesperfecto(true)}
