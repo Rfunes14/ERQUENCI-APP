@@ -1220,6 +1220,20 @@ export default function App() {
       valor_tramo_2: 11260.08,
     },
   ]);
+  const [mostrarFormArt, setMostrarFormArt] = useState(false);
+  const [artEditandoNombre, setArtEditandoNombre] = useState(null);
+  const [formArt, setFormArt] = useState({
+    nombre_art: '',
+    valor_tramo_1: 5630.04,
+    valor_tramo_2: 11260.08,
+    valor_km: 656.85,
+    bajada_bandera: 0,
+    valor_hora_espera: 5630.04,
+    espera_desde_hora: 1,
+    modo_facturacion_default: 'URBANO_TRAMOS_Y_KM_CP',
+    regla_km: 'SOLO_IDA_PACIENTE',
+  });
+
 
   const [centrosMedicos, setCentrosMedicos] = useState([
     { id: 'cm-riv340', nombre: 'Fisiokinesio Terapia / Consultorios Rivadavia', direccion: 'Bernardino Rivadavia 340, San Rafael, Mendoza', codigo_postal: '5600', lat: -34.6152, lng: -68.3342 },
@@ -1695,7 +1709,6 @@ export default function App() {
           resTarifas.data.map((t) => {
             if (t.nombre_art === 'Prevención ART') {
               return {
-                ...t,
                 valor_km: 656.85,
                 valor_hora_espera: 5630.04,
                 espera_desde_hora: 1,
@@ -1703,6 +1716,7 @@ export default function App() {
                 regla_km: 'SOLO_IDA_PACIENTE',
                 valor_tramo_1: 5630.04,
                 valor_tramo_2: 11260.08,
+                ...t,
               };
             }
             return {
@@ -3112,6 +3126,109 @@ export default function App() {
     await supabase.from('tarifas_art').update({ [campo]: valor }).eq('nombre_art', nombreArt);
   };
 
+  const guardarMapaTarifasLocal = (lista) => {
+    const mapa = {};
+    lista.forEach((t) => {
+      mapa[t.nombre_art] = t;
+    });
+    localStorage.setItem('erquenci_tarifas_v3', JSON.stringify(mapa));
+  };
+
+  const abrirNuevaArt = () => {
+    setArtEditandoNombre(null);
+    setFormArt({
+      nombre_art: '',
+      valor_tramo_1: 5630.04,
+      valor_tramo_2: 11260.08,
+      valor_km: 656.85,
+      bajada_bandera: 0,
+      valor_hora_espera: 5630.04,
+      espera_desde_hora: 1,
+      modo_facturacion_default: 'URBANO_TRAMOS_Y_KM_CP',
+      regla_km: 'SOLO_IDA_PACIENTE',
+    });
+    setMostrarFormArt(true);
+  };
+
+  const abrirEditarArt = (tar) => {
+    setArtEditandoNombre(tar.nombre_art);
+    setFormArt({
+      nombre_art: tar.nombre_art || '',
+      valor_tramo_1: Number(tar.valor_tramo_1 ?? 5630.04),
+      valor_tramo_2: Number(tar.valor_tramo_2 ?? 11260.08),
+      valor_km: Number(tar.valor_km ?? 656.85),
+      bajada_bandera: Number(tar.bajada_bandera ?? 0),
+      valor_hora_espera: Number(tar.valor_hora_espera ?? 5630.04),
+      espera_desde_hora: Number(tar.espera_desde_hora ?? 1),
+      modo_facturacion_default: tar.modo_facturacion_default || 'URBANO_TRAMOS_Y_KM_CP',
+      regla_km: tar.regla_km || 'SOLO_IDA_PACIENTE',
+    });
+    setMostrarFormArt(true);
+  };
+
+  const guardarArt = async (e) => {
+    e.preventDefault();
+    const nombreLimpio = (formArt.nombre_art || '').trim();
+    if (!nombreLimpio) return alert('Ingresá el nombre de la ART.');
+
+    const existeDuplicada = tarifasArt.some(
+      (t) =>
+        t.nombre_art.toLowerCase() === nombreLimpio.toLowerCase() &&
+        t.nombre_art !== artEditandoNombre
+    );
+    if (existeDuplicada) {
+      return alert(`Ya existe una ART llamada "${nombreLimpio}".`);
+    }
+
+    const payload = {
+      nombre_art: nombreLimpio,
+      valor_tramo_1: Number(formArt.valor_tramo_1 || 0),
+      valor_tramo_2: Number(formArt.valor_tramo_2 || 0),
+      valor_km: Number(formArt.valor_km || 0),
+      bajada_bandera: Number(formArt.bajada_bandera || 0),
+      valor_hora_espera: Number(formArt.valor_hora_espera || 0),
+      espera_desde_hora: Number(formArt.espera_desde_hora ?? 1),
+      modo_facturacion_default: formArt.modo_facturacion_default || 'URBANO_TRAMOS_Y_KM_CP',
+      regla_km: formArt.regla_km || 'SOLO_IDA_PACIENTE',
+    };
+
+    if (artEditandoNombre) {
+      const nuevas = tarifasArt.map((t) =>
+        t.nombre_art === artEditandoNombre ? { ...t, ...payload } : t
+      );
+      setTarifasArt(nuevas);
+      guardarMapaTarifasLocal(nuevas);
+      await supabase.from('tarifas_art').update(payload).eq('nombre_art', artEditandoNombre);
+    } else {
+      const nuevaLocal = { id: 't-' + Date.now(), ...payload };
+      const { data, error } = await supabase
+        .from('tarifas_art')
+        .insert([payload])
+        .select();
+      const creada = data && data[0] ? data[0] : nuevaLocal;
+      if (error) {
+        console.warn('No se pudo insertar ART en Supabase (se guarda local):', error.message);
+      }
+      const nuevas = [...tarifasArt, creada];
+      setTarifasArt(nuevas);
+      guardarMapaTarifasLocal(nuevas);
+    }
+
+    setMostrarFormArt(false);
+    setArtEditandoNombre(null);
+  };
+
+  const eliminarArt = async (tar) => {
+    if (tarifasArt.length <= 1) {
+      return alert('Debe quedar al menos una ART activa en el sistema.');
+    }
+    if (!window.confirm(`¿Confirmás eliminar la ART "${tar.nombre_art}" y su tarifario?`)) return;
+    const nuevas = tarifasArt.filter((t) => t.nombre_art !== tar.nombre_art);
+    setTarifasArt(nuevas);
+    guardarMapaTarifasLocal(nuevas);
+    await supabase.from('tarifas_art').delete().eq('nombre_art', tar.nombre_art);
+  };
+
   // PANTALLA DE LOGIN REAL
   if (!modoDemo && !session && !esAccesoExclusivoPaciente && !esAccesoExclusivoChofer) {
     return (
@@ -4446,23 +4563,180 @@ export default function App() {
           {tabAdmin === 'LIQUIDACION' && (
             <div className="space-y-6">
               <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
-                <div>
-                  <h3 className="font-bold text-sm text-slate-900">
-                    Convenios y Reglas de Tarifación por Aseguradora (ART)
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Valores convenidos activos: Radio Céntrico Ida (Tramo 1) <strong>$5.630,04</strong> • Ida y Vuelta (Tramo 1 + Tramo 2) <strong>$11.260,08</strong> • Hora de Espera <strong>$5.630,04</strong> • Kilómetro Solo de Ida <strong>$656,85</strong>.
-                  </p>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3 className="font-bold text-sm text-slate-900">
+                      Convenios y Reglas de Tarifación por Aseguradora (ART)
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Valores convenidos activos: Radio Céntrico Ida (Tramo 1) <strong>$5.630,04</strong> • Ida y Vuelta (Tramo 1 + Tramo 2) <strong>$11.260,08</strong> • Hora de Espera <strong>$5.630,04</strong> • Kilómetro Solo de Ida <strong>$656,85</strong>.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={abrirNuevaArt}
+                    className="px-3.5 py-2 bg-[#1E588D] hover:bg-[#16426B] text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm"
+                  >
+                    <Plus className="w-4 h-4" /> Nueva ART
+                  </button>
                 </div>
+
+                {mostrarFormArt && (
+                  <form onSubmit={guardarArt} className="p-4 rounded-2xl border-2 border-[#1E588D]/30 bg-blue-50/40 space-y-3 text-xs">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-extrabold text-sm text-[#1E588D]">
+                        {artEditandoNombre ? `Editar ART: ${artEditandoNombre}` : 'Agregar Nueva Aseguradora (ART)'}
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMostrarFormArt(false);
+                          setArtEditandoNombre(null);
+                        }}
+                        className="p-1 rounded-lg hover:bg-slate-200 text-slate-500"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                      <div className="sm:col-span-2">
+                        <label className="text-[10px] font-bold text-slate-700 block mb-0.5">Nombre de la ART *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Ej: Swiss Medical ART"
+                          value={formArt.nombre_art}
+                          onChange={(e) => setFormArt({ ...formArt, nombre_art: e.target.value })}
+                          className="w-full border bg-white rounded-lg px-2.5 py-1.5 font-bold text-slate-900"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="text-[10px] font-bold text-slate-700 block mb-0.5">Criterio Principal de Facturación</label>
+                        <select
+                          value={formArt.modo_facturacion_default}
+                          onChange={(e) => setFormArt({ ...formArt, modo_facturacion_default: e.target.value })}
+                          className="w-full border bg-white rounded-lg px-2.5 py-1.5 font-semibold text-slate-800"
+                        >
+                          {Object.entries(MODOS_FACTURACION_ART_LABELS).map(([k, label]) => (
+                            <option key={k} value={k}>{label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-teal-800 block mb-0.5">Radio Céntrico Ida — Tramo 1 ($)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={formArt.valor_tramo_1}
+                          onChange={(e) => setFormArt({ ...formArt, valor_tramo_1: e.target.value })}
+                          className="w-full border bg-white rounded-lg px-2.5 py-1.5 font-bold text-teal-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-teal-800 block mb-0.5">Ida y Vuelta — Tramo 1+2 ($)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={formArt.valor_tramo_2}
+                          onChange={(e) => setFormArt({ ...formArt, valor_tramo_2: e.target.value })}
+                          className="w-full border bg-white rounded-lg px-2.5 py-1.5 font-bold text-teal-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-[#1E588D] block mb-0.5">Valor por KM ($)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={formArt.valor_km}
+                          onChange={(e) => setFormArt({ ...formArt, valor_km: e.target.value })}
+                          className="w-full border bg-white rounded-lg px-2.5 py-1.5 font-bold text-[#1E588D]"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-[#1E588D] block mb-0.5">Modalidad de Conteo de KM</label>
+                        <select
+                          value={formArt.regla_km}
+                          onChange={(e) => setFormArt({ ...formArt, regla_km: e.target.value })}
+                          className="w-full border bg-white rounded-lg px-2 py-1.5 font-semibold"
+                        >
+                          {Object.entries(REGLAS_KM_ART_LABELS).map(([k, label]) => (
+                            <option key={k} value={k}>{label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-amber-800 block mb-0.5">Valor Hora de Espera ($)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={formArt.valor_hora_espera}
+                          onChange={(e) => setFormArt({ ...formArt, valor_hora_espera: e.target.value })}
+                          className="w-full border bg-white rounded-lg px-2.5 py-1.5 font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-amber-800 block mb-0.5">Espera: ¿Desde cuántas hs suma?</label>
+                        <select
+                          value={Number(formArt.espera_desde_hora)}
+                          onChange={(e) => setFormArt({ ...formArt, espera_desde_hora: Number(e.target.value) })}
+                          className="w-full border bg-white rounded-lg px-2 py-1.5 font-bold text-amber-900"
+                        >
+                          <option value={0}>Desde la 1ra hora (0 hs sin cargo)</option>
+                          <option value={1}>A partir de la 2da hora (1ra hora sin cargo)</option>
+                          <option value={1.5}>A partir de 1.5 hs</option>
+                          <option value={2}>A partir de la 3ra hora (2 hs sin cargo)</option>
+                        </select>
+                      </div>
+                      <div className="sm:col-span-2 flex items-end justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMostrarFormArt(false);
+                            setArtEditandoNombre(null);
+                          }}
+                          className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white font-bold text-slate-600 hover:bg-slate-100"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-4 py-1.5 rounded-lg bg-[#34B37B] hover:bg-emerald-600 text-white font-bold flex items-center gap-1 shadow-sm"
+                        >
+                          <Check className="w-4 h-4" /> {artEditandoNombre ? 'Guardar Cambios' : 'Agregar ART'}
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                )}
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {tarifasArt.map((tar) => (
                     <div key={tar.nombre_art} className="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-3 text-xs">
-                      <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                        <span className="font-extrabold text-sm text-[#1E588D]">{tar.nombre_art}</span>
-                        <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 font-bold rounded-full text-[10px]">
-                          Convenio Activo
-                        </span>
+                      <div className="flex items-center justify-between border-b border-slate-200 pb-2 gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-extrabold text-sm text-[#1E588D] truncate">{tar.nombre_art}</span>
+                          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold rounded-full text-[10px] shrink-0">
+                            Convenio Activo
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => abrirEditarArt(tar)}
+                            title="Editar ART"
+                            className="px-2 py-1 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 text-[#1E588D] font-bold flex items-center gap-1"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" /> Editar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => eliminarArt(tar)}
+                            title="Eliminar ART"
+                            className="px-2 py-1 rounded-lg bg-white border border-rose-200 hover:bg-rose-50 text-rose-600 font-bold flex items-center gap-1"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" /> Eliminar
+                          </button>
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -6173,3 +6447,4 @@ export default function App() {
     </div>
   );
 }
+
