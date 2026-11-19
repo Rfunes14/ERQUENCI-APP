@@ -1308,6 +1308,7 @@ export default function App() {
   const gpsWatchIdRef = useRef(null);
   const ultimoEnvioGpsRef = useRef(0);
   const viajeActivoIdRef = useRef(null);
+  const wakeLockRef = useRef(null);
   const [linkCopiadoMsg, setLinkCopiadoMsg] = useState('');
   const [guardandoHojaReal, setGuardandoHojaReal] = useState(false);
 
@@ -1647,6 +1648,20 @@ export default function App() {
           docs: normalizarDocsVehiculo(v.docs),
         }));
         setVehiculos(vehNorm);
+        if (!resChoferes || resChoferes.error || !resChoferes.data || resChoferes.data.length === 0) {
+          setChoferes((prev) =>
+            prev.map((c, idx) =>
+              idx === 0 && vehNorm[0]?.chofer_foto
+                ? {
+                    ...c,
+                    nombre: vehNorm[0].chofer_nombre || c.nombre,
+                    foto_url: vehNorm[0].chofer_foto,
+                    licencia_venc: vehNorm[0].licencia_venc || c.licencia_venc,
+                  }
+                : c
+            )
+          );
+        }
         setNuevoViaje((prev) => ({
           ...prev,
           vehiculo_id: vehNorm[0].id,
@@ -1853,15 +1868,21 @@ export default function App() {
     setTimeout(() => setLinkCopiadoMsg(''), 4500);
   };
 
-  const detenerGpsRealDispositivo = () => {
+  const detenerGpsRealDispositivo = async () => {
     if (gpsWatchIdRef.current !== null && navigator.geolocation) {
       navigator.geolocation.clearWatch(gpsWatchIdRef.current);
       gpsWatchIdRef.current = null;
     }
+    if (wakeLockRef.current) {
+      try {
+        await wakeLockRef.current.release();
+      } catch (e) {}
+      wakeLockRef.current = null;
+    }
     setGpsRealActivo(false);
   };
 
-  const activarGpsRealDispositivo = (silencioso = false) => {
+  const activarGpsRealDispositivo = async (silencioso = false) => {
     if (!navigator.geolocation) {
       if (!silencioso) alert('Tu navegador no soporta geolocalización GPS.');
       return;
@@ -1869,6 +1890,14 @@ export default function App() {
     if (gpsWatchIdRef.current !== null) {
       setGpsRealActivo(true);
       return;
+    }
+    // Solicitar Wake Lock para que la pantalla del celular no se bloquee sola durante el viaje
+    if ('wakeLock' in navigator) {
+      try {
+        wakeLockRef.current = await navigator.wakeLock.request('screen');
+      } catch (e) {
+        console.warn('WakeLock no disponible:', e);
+      }
     }
     setGpsRealActivo(true);
     gpsWatchIdRef.current = navigator.geolocation.watchPosition(
@@ -1906,7 +1935,26 @@ export default function App() {
   const leerArchivoBase64 = (file, cb) => {
     if (!file) return;
     const reader = new FileReader();
-    reader.onloadend = () => cb(reader.result);
+    reader.onloadend = () => {
+      const resultado = reader.result;
+      if (file.type && file.type.startsWith('image/') && typeof resultado === 'string') {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 280;
+          const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          cb(canvas.toDataURL('image/jpeg', 0.82));
+        };
+        img.onerror = () => cb(resultado);
+        img.src = resultado;
+      } else {
+        cb(resultado);
+      }
+    };
     reader.readAsDataURL(file);
   };
 
@@ -2867,14 +2915,36 @@ export default function App() {
       foto_url: choferEditando.foto_url,
       licencia_venc: choferEditando.licencia_venc,
     };
-    await supabase.from('choferes').update(patch).eq('id', choferEditando.id);
+    const { data: chUpdated } = await supabase.from('choferes').update(patch).eq('id', choferEditando.id).select();
+    if (!chUpdated || chUpdated.length === 0) {
+      await supabase.from('choferes').insert([patch]).select();
+    }
     const nuevaLista = choferes.map((c) => (c.id === choferEditando.id ? { ...c, ...patch } : c));
     setChoferes(nuevaLista);
     localStorage.setItem('erquenci_choferes_v3', JSON.stringify(nuevaLista));
 
+    // Persistir la foto y datos actualizados del chofer también en los vehículos de Supabase para que el Paciente la vea en cualquier celular
+    const vehiculosAfectados = vehiculos.filter(
+      (v) =>
+        v.chofer_id === choferEditando.id ||
+        v.id === choferEditando.vehiculo_habitual_id ||
+        v.chofer_nombre === choferEditando.nombre ||
+        vehiculos.length === 1
+    );
+    for (const v of vehiculosAfectados) {
+      await supabase
+        .from('vehiculos')
+        .update({
+          chofer_nombre: choferEditando.nombre,
+          chofer_foto: choferEditando.foto_url,
+          licencia_venc: choferEditando.licencia_venc,
+        })
+        .eq('id', v.id);
+    }
+
     setVehiculos((prev) =>
       prev.map((v) =>
-        v.chofer_id === choferEditando.id || v.chofer_nombre === choferEditando.nombre
+        vehiculosAfectados.some((af) => af.id === v.id)
           ? {
               ...v,
               chofer_nombre: choferEditando.nombre,
