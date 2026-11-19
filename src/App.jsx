@@ -1309,6 +1309,7 @@ export default function App() {
   const ultimoEnvioGpsRef = useRef(0);
   const viajeActivoIdRef = useRef(null);
   const wakeLockRef = useRef(null);
+  const bgWatcherIdRef = useRef(null);
   const [linkCopiadoMsg, setLinkCopiadoMsg] = useState('');
   const [guardandoHojaReal, setGuardandoHojaReal] = useState(false);
 
@@ -1868,7 +1869,37 @@ export default function App() {
     setTimeout(() => setLinkCopiadoMsg(''), 4500);
   };
 
+  const procesarNuevaCoordenadaGps = async (lat, lng) => {
+    const idActual = viajeActivoIdRef.current;
+    if (!idActual) return;
+    const ahoraMs = Date.now();
+    if (ahoraMs - ultimoEnvioGpsRef.current < 2500) return;
+    ultimoEnvioGpsRef.current = ahoraMs;
+
+    const coords = {
+      lat: +Number(lat).toFixed(6),
+      lng: +Number(lng).toFixed(6),
+      ts: ahoraMs,
+    };
+
+    setTraslados((prev) =>
+      prev.map((t) => (t.id === idActual ? { ...t, coords_reales: coords } : t))
+    );
+    emitirCambioEnVivo(idActual, { coords_reales: coords });
+
+    if (!String(idActual).startsWith('real-')) {
+      await supabase.from('traslados').update({ coords_reales: coords }).eq('id', idActual);
+    }
+  };
+
   const detenerGpsRealDispositivo = async () => {
+    const BgGeo = window.Capacitor?.Plugins?.BackgroundGeolocation;
+    if (bgWatcherIdRef.current && BgGeo) {
+      try {
+        await BgGeo.removeWatcher({ id: bgWatcherIdRef.current });
+      } catch (e) {}
+      bgWatcherIdRef.current = null;
+    }
     if (gpsWatchIdRef.current !== null && navigator.geolocation) {
       navigator.geolocation.clearWatch(gpsWatchIdRef.current);
       gpsWatchIdRef.current = null;
@@ -1883,6 +1914,44 @@ export default function App() {
   };
 
   const activarGpsRealDispositivo = async (silencioso = false) => {
+    // 1. Si corre dentro del APK Android (Capacitor), usar GPS nativo en segundo plano (funciona con pantalla bloqueada)
+    const BgGeo = window.Capacitor?.Plugins?.BackgroundGeolocation;
+    if (BgGeo) {
+      if (bgWatcherIdRef.current) {
+        setGpsRealActivo(true);
+        return;
+      }
+      try {
+        setGpsRealActivo(true);
+        const watcherId = await BgGeo.addWatcher(
+          {
+            backgroundTitle: 'Erquenci ART — Traslado en Curso',
+            backgroundMessage: 'Transmitiendo ubicación GPS en tiempo real (podés bloquear la pantalla).',
+            requestPermissions: true,
+            stale: false,
+            distanceFilter: 10,
+          },
+          (location, error) => {
+            if (error) {
+              if (error.code === 'NOT_AUTHORIZED' && !silencioso) {
+                alert('Habilitá el permiso de ubicación "Permitir todo el tiempo" en Ajustes para usar con pantalla bloqueada.');
+                BgGeo.openSettings?.();
+              }
+              return;
+            }
+            if (location) {
+              procesarNuevaCoordenadaGps(location.latitude, location.longitude);
+            }
+          }
+        );
+        bgWatcherIdRef.current = watcherId;
+        return;
+      } catch (e) {
+        console.warn('Fallback a GPS web:', e);
+      }
+    }
+
+    // 2. Modo Navegador Web: Geolocation + Wake Lock (mantiene pantalla encendida)
     if (!navigator.geolocation) {
       if (!silencioso) alert('Tu navegador no soporta geolocalización GPS.');
       return;
@@ -1891,7 +1960,6 @@ export default function App() {
       setGpsRealActivo(true);
       return;
     }
-    // Solicitar Wake Lock para que la pantalla del celular no se bloquee sola durante el viaje
     if ('wakeLock' in navigator) {
       try {
         wakeLockRef.current = await navigator.wakeLock.request('screen');
@@ -1901,28 +1969,7 @@ export default function App() {
     }
     setGpsRealActivo(true);
     gpsWatchIdRef.current = navigator.geolocation.watchPosition(
-      async (pos) => {
-        const idActual = viajeActivoIdRef.current;
-        if (!idActual) return;
-        const ahoraMs = Date.now();
-        if (ahoraMs - ultimoEnvioGpsRef.current < 2500) return;
-        ultimoEnvioGpsRef.current = ahoraMs;
-
-        const coords = {
-          lat: +pos.coords.latitude.toFixed(6),
-          lng: +pos.coords.longitude.toFixed(6),
-          ts: ahoraMs,
-        };
-
-        setTraslados((prev) =>
-          prev.map((t) => (t.id === idActual ? { ...t, coords_reales: coords } : t))
-        );
-        emitirCambioEnVivo(idActual, { coords_reales: coords });
-
-        if (!String(idActual).startsWith('real-')) {
-          await supabase.from('traslados').update({ coords_reales: coords }).eq('id', idActual);
-        }
-      },
+      (pos) => procesarNuevaCoordenadaGps(pos.coords.latitude, pos.coords.longitude),
       (err) => {
         console.warn('Error GPS:', err);
         setGpsRealActivo(false);
@@ -2092,7 +2139,7 @@ export default function App() {
     }
     if (filtroArtTorre !== 'TODAS' && t.art_nombre !== filtroArtTorre) return false;
     if (filtroEstadoTorre === 'EN_CURSO') {
-      if (t.estado === 'FINALIZADO' || t.estado === 'CANCELADO') return false;
+      if (t.estado === 'REALIZADO' || t.estado === 'FINALIZADO' || t.estado === 'CANCELADO') return false;
     } else if (filtroEstadoTorre !== 'TODOS' && t.estado !== filtroEstadoTorre) {
       return false;
     }
@@ -3438,6 +3485,7 @@ export default function App() {
                     <option value="EN_CAMINO_DOMICILIO">En Camino a Domicilio</option>
                     <option value="EN_DOMICILIO">En Puerta / Domicilio</option>
                     <option value="PACIENTE_A_BORDO">Paciente a Bordo</option>
+                    <option value="REALIZADO">Realizado</option>
                     <option value="FINALIZADO">Finalizado</option>
                     <option value="ALERTA_DESPERFECTO">Alerta Desperfecto</option>
                   </select>
@@ -3527,7 +3575,7 @@ export default function App() {
                               className={`px-3 py-1 rounded-full text-xs font-bold ${
                                 esAlerta
                                   ? 'bg-red-600 text-white'
-                                  : t.estado === 'FINALIZADO'
+                                  : t.estado === 'REALIZADO' || t.estado === 'FINALIZADO'
                                   ? 'bg-emerald-100 text-emerald-800'
                                   : 'bg-amber-100 text-amber-800'
                               }`}
@@ -5696,6 +5744,7 @@ export default function App() {
                     <option value="EN_CAMINO_DOMICILIO">EN CAMINO A DOMICILIO</option>
                     <option value="EN_DOMICILIO">EN DOMICILIO</option>
                     <option value="PACIENTE_A_BORDO">PACIENTE A BORDO</option>
+                    <option value="REALIZADO">REALIZADO</option>
                     <option value="FINALIZADO">FINALIZADO</option>
                     <option value="ALERTA_DESPERFECTO">ALERTA DESPERFECTO</option>
                     <option value="CANCELADO">CANCELADO</option>
@@ -5974,8 +6023,10 @@ export default function App() {
                     Firma Digital del Paciente al Finalizar:
                   </label>
                   <SignaturePad
-                    disabled={viajeActivo.estado === 'FINALIZADO'}
-                    onSave={(dataUrl) => cambiarEstadoViaje(viajeActivo.id, 'FINALIZADO', { firma_url: dataUrl })}
+                    disabled={viajeActivo.estado === 'REALIZADO' || viajeActivo.estado === 'FINALIZADO'}
+                    onSave={(dataUrl) =>
+                      cambiarEstadoViaje(viajeActivo.id, 'REALIZADO', { firma_url: dataUrl, gps_progreso: 100 })
+                    }
                   />
                 </div>
               </div>
