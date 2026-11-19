@@ -1293,9 +1293,9 @@ export default function App() {
   ]);
   const [vehiculoEditando, setVehiculoEditando] = useState(null);
 
-  // Inicializamos con los 3 traslados reales de mañana 19/11/2026
-  const [traslados, setTraslados] = useState(HOJA_RUTA_REAL_19_11_2026);
-  const [viajeSeleccionadoId, setViajeSeleccionadoId] = useState(HOJA_RUTA_REAL_19_11_2026[0].id);
+  // 100% hidratado desde Supabase (sin re-inyectar viajes hardcodeados)
+  const [traslados, setTraslados] = useState([]);
+  const [viajeSeleccionadoId, setViajeSeleccionadoId] = useState(null);
   const [tabAdmin, setTabAdmin] = useState('TORRE');
   const [filtroArtLiquidacion, setFiltroArtLiquidacion] = useState('TODAS');
   const [nuevoMensaje, setNuevoMensaje] = useState('');
@@ -1717,27 +1717,22 @@ export default function App() {
         );
       }
 
-      if (resTraslados.data && resTraslados.data.length > 0) {
-        // Combinar los de Supabase con los 3 reales del 19/11/2026 si aún no fueron insertados en DB
-        const dnisEnDb = new Set(resTraslados.data.map((t) => String(t.paciente_dni).trim()));
-        const faltantesReales = HOJA_RUTA_REAL_19_11_2026.filter((r) => !dnisEnDb.has(r.paciente_dni));
-        const combinados = [...faltantesReales, ...resTraslados.data];
-        setTraslados(combinados);
+      if (resTraslados.data) {
+        const lista = resTraslados.data;
+        setTraslados(lista);
 
         if (pacienteTokenUrl) {
-          const encontrado = combinados.find((t) => t.token_paciente === pacienteTokenUrl);
+          const encontrado = lista.find((t) => t.token_paciente === pacienteTokenUrl);
           if (encontrado) setViajeSeleccionadoId(encontrado.id);
         } else if (trasladoIdUrl) {
-          const encontrado = combinados.find((t) => String(t.id) === String(trasladoIdUrl));
+          const encontrado = lista.find((t) => String(t.id) === String(trasladoIdUrl));
           if (encontrado) setViajeSeleccionadoId(encontrado.id);
         } else if (choferIdUrl) {
-          const delChofer = combinados.find((t) => obtenerMetaTraslado(t).chofer_id === choferIdUrl);
+          const delChofer = lista.find((t) => obtenerMetaTraslado(t).chofer_id === choferIdUrl);
           if (delChofer) setViajeSeleccionadoId(delChofer.id);
-        } else if (!viajeSeleccionadoId) {
-          setViajeSeleccionadoId(combinados[0].id);
+        } else if (lista.length > 0 && !viajeSeleccionadoId) {
+          setViajeSeleccionadoId(lista[0].id);
         }
-      } else {
-        setTraslados(HOJA_RUTA_REAL_19_11_2026);
       }
     } catch (err) {
       console.error('Error sincronizando Supabase:', err);
@@ -1774,14 +1769,8 @@ export default function App() {
   const sincronizarTrasladosSilencioso = async () => {
     try {
       const { data } = await supabase.from('traslados').select('*').order('created_at', { ascending: false });
-      if (data && data.length > 0) {
-        setTraslados((prev) => {
-          const dnisEnDb = new Set(data.map((t) => String(t.paciente_dni).trim()));
-          const localesPendientes = prev.filter(
-            (r) => String(r.id).startsWith('real-') && !dnisEnDb.has(String(r.paciente_dni).trim())
-          );
-          return [...localesPendientes, ...data];
-        });
+      if (data) {
+        setTraslados(data);
         setUltimaSyncVivo(new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
       }
     } catch (e) {
@@ -3219,7 +3208,7 @@ export default function App() {
     horasEsperaTotal: 0,
   });
 
-  const hayTrasladosLocalesSinImpactar = traslados.some((t) => String(t.id).startsWith('real-'));
+  const hayTrasladosLocalesSinImpactar = false;
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
