@@ -709,7 +709,187 @@ const MapaSeguimientoGps = ({
 // ============================================================================
 // MAPA GENERAL DE FLOTA EN VIVO (PARA TORRE DE CONTROL ART)
 // ============================================================================
-const MapaGeneralFlota = ({ trasladosActivos, vehiculos, obtenerNombreChofer }) => {
+const CursorTrianguloErquenci = () => {
+  const [pos, setPos] = useState({ x: -100, y: -100 });
+  const [activo, setActivo] = useState(false);
+  const [sobreBoton, setSobreBoton] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia('(pointer: fine)').matches) return;
+    const onMove = (e) => {
+      setActivo(true);
+      setPos({ x: e.clientX, y: e.clientY });
+      const target = e.target;
+      const esInteractivo = Boolean(target?.closest && target.closest('button, a, select, input, [role="button"]'));
+      setSobreBoton(esInteractivo);
+    };
+    const onLeave = () => setActivo(false);
+    window.addEventListener('mousemove', onMove, { passive: true });
+    document.addEventListener('mouseleave', onLeave);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseleave', onLeave);
+    };
+  }, []);
+
+  if (!activo) return null;
+
+  return (
+    <div
+      className="fixed top-0 left-0 pointer-events-none z-[9999] transition-transform duration-75 ease-out"
+      style={{
+        transform: `translate3d(${pos.x - 10}px, ${pos.y - 8}px, 0) scale(${sobreBoton ? 1.28 : 1}) rotate(${sobreBoton ? '-12deg' : '0deg'})`,
+      }}
+    >
+      <div
+        className="absolute -inset-2 rounded-full blur-md opacity-60 animate-pulse"
+        style={{ background: 'radial-gradient(circle, rgba(52,179,123,0.75) 0%, rgba(30,88,141,0.45) 70%, transparent 100%)' }}
+      />
+      <svg width="26" height="26" viewBox="0 0 28 28" fill="none" className="relative drop-shadow-[0_3px_8px_rgba(30,88,141,0.55)]">
+        <defs>
+          <linearGradient id="erqTriCursor" x1="2" y1="2" x2="26" y2="26" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#34B37B" />
+            <stop offset="50%" stopColor="#268786" />
+            <stop offset="100%" stopColor="#1E588D" />
+          </linearGradient>
+        </defs>
+        <path
+          d="M4 3L24 12.5L13.5 16L10 25L4 3Z"
+          fill="url(#erqTriCursor)"
+          stroke="#ffffff"
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </div>
+  );
+};
+
+const MapaNavegacionChofer = ({ viaje, prestador }) => {
+  const mapRef = useRef(null);
+  const instanceRef = useRef(null);
+  const routeLayerRef = useRef(null);
+  const markersRef = useRef([]);
+  const [infoRuta, setInfoRuta] = useState({ km: null, min: null });
+
+  const choferLat = viaje?.coords_reales?.lat || prestador?.base_lat || -34.6158;
+  const choferLng = viaje?.coords_reales?.lng || prestador?.base_lng || -68.3285;
+  const origLat = viaje?.origen_lat || -34.6245;
+  const origLng = viaje?.origen_lng || -68.3480;
+  const destLat = viaje?.destino_lat || -34.6152;
+  const destLng = viaje?.destino_lng || -68.3342;
+
+  useEffect(() => {
+    if (!mapRef.current || !window.L || instanceRef.current) return;
+    const L = window.L;
+    const map = L.map(mapRef.current, { center: [choferLat, choferLng], zoom: 13 });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap',
+    }).addTo(map);
+    instanceRef.current = map;
+    return () => {
+      if (instanceRef.current) {
+        instanceRef.current.remove();
+        instanceRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const map = instanceRef.current;
+    const L = window.L;
+    if (!map || !L || !viaje) return;
+
+    markersRef.current.forEach((m) => map.removeLayer(m));
+    markersRef.current = [];
+    if (routeLayerRef.current) {
+      map.removeLayer(routeLayerRef.current);
+      routeLayerRef.current = null;
+    }
+
+    const pinChofer = L.divIcon({
+      className: 'ch-pin',
+      html: `<div style="background:#0f766e;color:#fff;padding:3px 8px;border-radius:999px;font-weight:800;font-size:10px;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.35);white-space:nowrap;">🚕 Tu Móvil</div>`,
+      iconSize: [90, 22],
+      iconAnchor: [45, 11],
+    });
+    const pinOrig = L.divIcon({
+      className: 'orig-pin',
+      html: `<div style="background:#1E588D;color:#fff;padding:3px 8px;border-radius:999px;font-weight:800;font-size:10px;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.35);white-space:nowrap;">🏠 Paciente</div>`,
+      iconSize: [95, 22],
+      iconAnchor: [47, 11],
+    });
+    const pinDest = L.divIcon({
+      className: 'dest-pin',
+      html: `<div style="background:#e11d48;color:#fff;padding:3px 8px;border-radius:999px;font-weight:800;font-size:10px;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.35);white-space:nowrap;">🏥 Destino</div>`,
+      iconSize: [90, 22],
+      iconAnchor: [45, 11],
+    });
+
+    const m1 = L.marker([choferLat, choferLng], { icon: pinChofer }).addTo(map).bindPopup('<b>Tu ubicación actual</b>');
+    const m2 = L.marker([origLat, origLng], { icon: pinOrig }).addTo(map).bindPopup(`<b>Retiro Paciente:</b><br/>${viaje.origen_direccion}`);
+    const m3 = L.marker([destLat, destLng], { icon: pinDest }).addTo(map).bindPopup(`<b>Destino Final:</b><br/>${viaje.destino_nombre}`);
+    markersRef.current = [m1, m2, m3];
+
+    const coordsStr = `${choferLng},${choferLat};${origLng},${origLat};${destLng},${destLat}`;
+    fetch(`https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson`)
+      .then((r) => r.json())
+      .then((res) => {
+        if (!instanceRef.current) return;
+        if (res?.routes?.[0]?.geometry?.coordinates) {
+          const latlngs = res.routes[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+          routeLayerRef.current = L.polyline(latlngs, { color: '#1E588D', weight: 5, opacity: 0.85 }).addTo(map);
+          map.fitBounds(routeLayerRef.current.getBounds(), { padding: [28, 28] });
+          setInfoRuta({
+            km: (res.routes[0].distance / 1000).toFixed(1),
+            min: Math.max(1, Math.round(res.routes[0].duration / 60)),
+          });
+        } else {
+          routeLayerRef.current = L.polyline([[choferLat, choferLng], [origLat, origLng], [destLat, destLng]], {
+            color: '#1E588D',
+            weight: 4,
+            dashArray: '6,6',
+          }).addTo(map);
+          map.fitBounds(routeLayerRef.current.getBounds(), { padding: [28, 28] });
+        }
+      })
+      .catch(() => {
+        if (!instanceRef.current) return;
+        routeLayerRef.current = L.polyline([[choferLat, choferLng], [origLat, origLng], [destLat, destLng]], {
+          color: '#1E588D',
+          weight: 4,
+          dashArray: '6,6',
+        }).addTo(map);
+      });
+  }, [viaje?.id, choferLat, choferLng, origLat, origLng, destLat, destLng]);
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+      <div className="px-4 py-2.5 bg-slate-900 text-white flex flex-wrap justify-between items-center gap-2 text-xs">
+        <span className="font-bold flex items-center gap-1.5">
+          <Compass className="w-4 h-4 text-[#34B37B]" /> Navegador GPS Integrado (Móvil → Paciente → Destino)
+        </span>
+        <div className="flex items-center gap-2">
+          {infoRuta.km && (
+            <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-200 font-bold text-[11px]">
+              {infoRuta.km} km • ~{infoRuta.min} min
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => instanceRef.current?.setView([choferLat, choferLng], 15)}
+            className="px-2.5 py-1 rounded-lg bg-[#34B37B] hover:bg-emerald-600 text-white font-bold text-[10px]"
+          >
+            Centrar en mí
+          </button>
+        </div>
+      </div>
+      <div ref={mapRef} className="w-full h-56 z-10" />
+    </div>
+  );
+};
+
+const MapaGeneralFlota = ({ trasladosActivos, vehiculos, prestadores = [], obtenerNombreChofer }) => {
   const mapRef = useRef(null);
   const instanceRef = useRef(null);
   const markersRef = useRef({});
@@ -777,13 +957,34 @@ const MapaGeneralFlota = ({ trasladosActivos, vehiculos, obtenerNombreChofer }) 
       }
     });
 
+    (prestadores || []).forEach((pr) => {
+      const pKey = 'prest-' + pr.id;
+      idsPresentes.add(pKey);
+      const pLat = pr.base_lat || -34.6158;
+      const pLng = pr.base_lng || -68.3285;
+      const pIcon = L.divIcon({
+        className: 'prest-pin',
+        html: `<div style="background:#0f172a;color:#34B37B;padding:3px 8px;border-radius:10px;font-weight:800;font-size:10px;border:2px solid #34B37B;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.3);">🏢 ${pr.razon_social} • ${pr.zona_cobertura || 'Zona'}</div>`,
+        iconSize: [165, 24],
+        iconAnchor: [82, 12],
+      });
+      const pPopup = `<b>🏢 Base Prestador: ${pr.razon_social}</b><br/>Zona: ${pr.zona_cobertura || 'San Rafael'}<br/>Base: ${pr.domicilio_base || 'Av. Moreno 37'}`;
+      if (markersRef.current[pKey]) {
+        markersRef.current[pKey].setLatLng([pLat, pLng]);
+        markersRef.current[pKey].setIcon(pIcon);
+        markersRef.current[pKey].setPopupContent(pPopup);
+      } else {
+        markersRef.current[pKey] = L.marker([pLat, pLng], { icon: pIcon }).addTo(map).bindPopup(pPopup);
+      }
+    });
+
     Object.keys(markersRef.current).forEach((idKey) => {
       if (!idsPresentes.has(idKey)) {
         map.removeLayer(markersRef.current[idKey]);
         delete markersRef.current[idKey];
       }
     });
-  }, [trasladosActivos, vehiculos]);
+  }, [trasladosActivos, vehiculos, prestadores]);
 
   const cantidadGpsReal = trasladosActivos.filter((t) => t.coords_reales?.lat).length;
 
@@ -1393,6 +1594,38 @@ export default function App() {
   const [filtroEstadoTorre, setFiltroEstadoTorre] = useState('TODOS');
   const [filtroFechaTorre, setFiltroFechaTorre] = useState('');
   const [filtroCondicionTorre, setFiltroCondicionTorre] = useState('TODAS');
+  const [filtroPrestadorTorre, setFiltroPrestadorTorre] = useState('TODOS');
+  const [filtroPrestadorHistorial, setFiltroPrestadorHistorial] = useState('TODOS');
+  const [filtroPrestadorLiquidacion, setFiltroPrestadorLiquidacion] = useState('TODOS');
+  const [prestadorExpandidoAudit, setPrestadorExpandidoAudit] = useState(null);
+  const [terminacionesPorPrestador, setTerminacionesPorPrestador] = useState(() => {
+    try {
+      const saved = localStorage.getItem('erquenci_terminaciones_v1');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return { '22222222-2222-2222-2222-222222222221': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] };
+  });
+
+  const toggleTerminacionPrestador = (prestId, digito) => {
+    setTerminacionesPorPrestador((prev) => {
+      const actuales = Array.isArray(prev[prestId]) ? prev[prestId] : [];
+      const existe = actuales.includes(digito);
+      const nuevos = existe ? actuales.filter((d) => d !== digito) : [...actuales, digito].sort((a, b) => a - b);
+      const next = { ...prev, [prestId]: nuevos };
+      localStorage.setItem('erquenci_terminaciones_v1', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const obtenerPrestadorPorSiniestro = (numSiniestro) => {
+    const limpio = String(numSiniestro || '').split('(')[0].replace(/\D/g, '');
+    if (!limpio) return null;
+    const ultimoDigito = Number(limpio.slice(-1));
+    const matchId = Object.keys(terminacionesPorPrestador).find((pid) =>
+      (terminacionesPorPrestador[pid] || []).includes(ultimoDigito)
+    );
+    return matchId ? { digito: ultimoDigito, prestador: prestadores.find((p) => p.id === matchId) } : { digito: ultimoDigito, prestador: null };
+  };
   const [busquedaHistorial, setBusquedaHistorial] = useState('');
   const [pacienteHistorialExpandido, setPacienteHistorialExpandido] = useState(null);
 
@@ -1642,7 +1875,7 @@ export default function App() {
           destino_lng: item.destino_lng,
           fecha_programada: item.fecha_programada,
           hora_programada: item.hora_programada,
-          estado: 'ASIGNADO',
+          estado: portalActivo?.rol === 'CENTRAL_ART' ? 'PENDIENTE_ACEPTACION' : 'ASIGNADO',
           km_reales: item.km_reales,
           horas_espera: 0,
           importe_total: Math.round(item.importe_total), // Si la columna en DB aún es integer, luego actualizamos con decimal
@@ -2262,8 +2495,12 @@ export default function App() {
     return true;
   });
 
-  // Filtrado de traslados en Torre de Control
+  // Filtrado de traslados en Torre de Control (en Portal Prestador desaparecen los finalizados de Hoja de Ruta)
   const trasladosFiltradosTorre = trasladosVisiblesPortal.filter((t) => {
+    if (portalActivo?.rol === 'PRESTADOR' && ['REALIZADO', 'FINALIZADO', 'CANCELADO'].includes(t.estado)) {
+      return false;
+    }
+    if (filtroPrestadorTorre !== 'TODOS' && t.prestador_id !== filtroPrestadorTorre) return false;
     const cond = obtenerMetaTraslado(t);
     const veh = vehiculos.find((v) => v.id === t.vehiculo_id);
     const ch = obtenerChoferDeTraslado(t);
@@ -3040,7 +3277,9 @@ export default function App() {
   };
 
   const historialPacientes = Object.values(
-    traslados.reduce((acc, t) => {
+    trasladosVisiblesPortal
+      .filter((t) => filtroPrestadorHistorial === 'TODOS' || t.prestador_id === filtroPrestadorHistorial)
+      .reduce((acc, t) => {
       const clave = (t.paciente_dni || t.paciente_nombre || 'SIN-DNI').trim();
       if (!acc[clave]) {
         acc[clave] = {
@@ -3387,25 +3626,41 @@ export default function App() {
     await supabase.from('tarifas_art').delete().eq('nombre_art', tar.nombre_art);
   };
 
-  // PANTALLA DE PORTADA Y LOGIN DUAL (CENTRAL ART / PRESTADOR / SÚPER ADMIN)
+  // PANTALLA DE PORTADA 3D GLASSMORPHISM Y LOGIN DUAL (ESTILO MODERNO COLORES LOGO ERQUENCI)
   if (!portalActivo && !esAccesoExclusivoPaciente && !esAccesoExclusivoChofer) {
     return (
-      <div className="min-h-screen relative flex items-center justify-center overflow-hidden bg-gradient-to-br from-slate-950 via-[#0d243c] to-[#0b3330] p-4">
+      <div className="min-h-screen relative flex items-center justify-center overflow-hidden bg-gradient-to-br from-slate-100 via-teal-50/80 to-blue-100/90 p-3 sm:p-6 cursor-none">
+        <CursorTrianguloErquenci />
         <style>{`
-          @keyframes erqFloatSlow {
+          @keyframes erqFloat3d {
+            0%, 100% { transform: translate3d(0px, 0px, 0px) rotate(0deg); }
+            50% { transform: translate3d(0px, -14px, 12px) rotate(2deg); }
+          }
+          @keyframes erqSphereFloat {
             0%, 100% { transform: translateY(0px) scale(1); }
-            50% { transform: translateY(-10px) scale(1.04); }
+            50% { transform: translateY(-18px) scale(1.04); }
           }
           @keyframes erqBtnEnter {
-            0% { opacity: 0; transform: translateY(12px) scale(0.95); }
+            0% { opacity: 0; transform: translateY(14px) scale(0.95); }
             100% { opacity: 1; transform: translateY(0) scale(1); }
           }
-          .animate-erq-float { animation: erqFloatSlow 5s ease-in-out infinite; }
-          .animate-erq-btn-enter { animation: erqBtnEnter 400ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+          .animate-erq-float3d { animation: erqFloat3d 5.5s ease-in-out infinite; }
+          .animate-erq-sphere { animation: erqSphereFloat 7s ease-in-out infinite; }
+          .animate-erq-btn-enter { animation: erqBtnEnter 450ms cubic-bezier(0.16, 1, 0.3, 1) both; }
         `}</style>
 
-        <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-[#34B37B]/20 blur-3xl animate-erq-float pointer-events-none" />
-        <div className="absolute -bottom-24 -right-24 w-96 h-96 rounded-full bg-[#1E588D]/30 blur-3xl animate-erq-float pointer-events-none" />
+        <div
+          className="absolute -top-16 right-12 w-72 h-72 rounded-full animate-erq-sphere pointer-events-none shadow-2xl"
+          style={{ background: 'radial-gradient(circle at 30% 30%, #38bdf8, #1E588D 70%, #0f2942 100%)' }}
+        />
+        <div
+          className="absolute -bottom-20 -left-16 w-80 h-80 rounded-full animate-erq-sphere pointer-events-none shadow-2xl"
+          style={{ animationDelay: '1.2s', background: 'radial-gradient(circle at 35% 30%, #6ee7b7, #34B37B 65%, #166534 100%)' }}
+        />
+        <div
+          className="absolute bottom-16 right-1/4 w-36 h-36 rounded-full animate-erq-float3d pointer-events-none opacity-90 shadow-xl"
+          style={{ background: 'radial-gradient(circle at 30% 30%, #5eead4, #268786 75%, #134e4a 100%)' }}
+        />
 
         {splashEstado !== 'OCULTO' && (
           <div
@@ -3414,14 +3669,14 @@ export default function App() {
             }`}
           >
             <div className="relative z-10 flex flex-col items-center gap-5 px-6 max-w-md w-full text-center">
-              <div className="bg-white/95 px-7 py-5 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.45)] border border-white/30">
+              <div className="bg-white/95 px-7 py-5 rounded-3xl shadow-[0_25px_70px_rgba(0,0,0,0.45)] border border-white/30">
                 <ErquenciLogo subtitle="Plataforma Operativa ART • GPS en Vivo" />
               </div>
               <div className="w-full max-w-xs space-y-2 mt-1">
                 <div className="flex items-center justify-between text-[11px] font-bold tracking-wider uppercase text-emerald-200/90">
                   <span className="flex items-center gap-2">
                     <span className={`w-2 h-2 rounded-full ${splashProgreso < 100 ? 'bg-amber-400 animate-ping' : 'bg-[#34B37B]'}`} />
-                    {splashProgreso < 50 ? 'Conectando con Supabase...' : splashProgreso < 100 ? 'Preparando portales ART...' : 'Sistema Operativo Listo'}
+                    {splashProgreso < 50 ? 'Conectando con Supabase...' : splashProgreso < 100 ? 'Preparando experiencia 3D...' : 'Sistema Operativo Listo'}
                   </span>
                   <span>{splashProgreso}%</span>
                 </div>
@@ -3436,10 +3691,10 @@ export default function App() {
                 <button
                   type="button"
                   onClick={ingresarDesdeSplash}
-                  className="animate-erq-btn-enter mt-2 group inline-flex items-center justify-center gap-2.5 px-7 py-3.5 rounded-2xl font-extrabold text-xs sm:text-sm tracking-wider uppercase text-white bg-gradient-to-r from-[#34B37B] via-[#268786] to-[#1E588D] shadow-[0_12px_35px_rgba(52,179,123,0.45)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 border border-white/25 cursor-pointer"
+                  className="animate-erq-btn-enter mt-2 group inline-flex items-center justify-center gap-2.5 px-7 py-3.5 rounded-2xl font-extrabold text-xs sm:text-sm tracking-wider uppercase text-white bg-gradient-to-r from-[#34B37B] via-[#268786] to-[#1E588D] shadow-[0_12px_35px_rgba(52,179,123,0.45)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 border border-white/25 cursor-none"
                 >
                   <ShieldCheck className="w-5 h-5 text-emerald-100" />
-                  <span>INGRESAR A LA PLATAFORMA</span>
+                  <span>INGRESAR A LA TORRE DE CONTROL</span>
                   <Navigation className="w-4 h-4 rotate-90 group-hover:translate-x-1 transition-transform" />
                 </button>
               )}
@@ -3447,160 +3702,233 @@ export default function App() {
           </div>
         )}
 
-        <div className="relative z-10 w-full max-w-xl bg-white/95 backdrop-blur-xl rounded-3xl shadow-[0_25px_70px_rgba(0,0,0,0.45)] border border-white/40 p-6 sm:p-8 space-y-6 animate-erq-btn-enter">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
-            <ErquenciLogo subtitle="Acceso Multi-Portal • ART y Prestadores" />
-            <span className="px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-[#34B37B] animate-pulse" /> En Línea
-            </span>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-              1. Seleccioná tu Portal de Ingreso
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+        <div className="relative z-10 w-full max-w-5xl rounded-[2rem] bg-white/70 backdrop-blur-2xl border border-white/80 shadow-[0_30px_90px_rgba(30,88,141,0.22)] overflow-hidden flex flex-col md:flex-row animate-erq-btn-enter">
+          <div className="w-full md:w-20 bg-white/85 border-b md:border-b-0 md:border-r border-white/80 flex md:flex-col items-center justify-between p-3 md:py-6 gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#34B37B] to-[#1E588D] flex items-center justify-center text-white shadow-lg">
+              <Activity className="w-6 h-6" />
+            </div>
+            <div className="flex md:flex-col items-center gap-2.5">
               <button
                 type="button"
                 onClick={() => setLoginTipoPortal('CENTRAL_ART')}
-                className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                title="Central ART"
+                className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all duration-200 ${
                   loginTipoPortal === 'CENTRAL_ART'
-                    ? 'bg-[#1E588D] text-white border-[#1E588D] shadow-lg -translate-y-0.5'
-                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    ? 'bg-gradient-to-br from-[#1E588D] to-[#268786] text-white shadow-[0_8px_20px_rgba(30,88,141,0.4)] scale-110'
+                    : 'bg-slate-100/80 text-slate-500 hover:bg-white'
                 }`}
               >
-                <ShieldCheck className="w-5 h-5 mb-1.5" />
-                <div className="font-extrabold text-xs">Central ART</div>
-                <div className={`text-[10px] ${loginTipoPortal === 'CENTRAL_ART' ? 'text-blue-100' : 'text-slate-500'}`}>
-                  Aseguradora y Gestores ZIS
-                </div>
+                <ShieldCheck className="w-5 h-5" />
               </button>
-
               <button
                 type="button"
                 onClick={() => setLoginTipoPortal('PRESTADOR')}
-                className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                title="Portal Prestador"
+                className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all duration-200 ${
                   loginTipoPortal === 'PRESTADOR'
-                    ? 'bg-[#34B37B] text-white border-[#34B37B] shadow-lg -translate-y-0.5'
-                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    ? 'bg-gradient-to-br from-[#34B37B] to-[#268786] text-white shadow-[0_8px_20px_rgba(52,179,123,0.4)] scale-110'
+                    : 'bg-slate-100/80 text-slate-500 hover:bg-white'
                 }`}
               >
-                <Truck className="w-5 h-5 mb-1.5" />
-                <div className="font-extrabold text-xs">Portal Prestador</div>
-                <div className={`text-[10px] ${loginTipoPortal === 'PRESTADOR' ? 'text-emerald-100' : 'text-slate-500'}`}>
-                  Flota, Choferes y Viajes
-                </div>
+                <Truck className="w-5 h-5" />
               </button>
-
               <button
                 type="button"
                 onClick={() => setLoginTipoPortal('SUPER_ADMIN')}
-                className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                title="Súper Admin"
+                className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all duration-200 ${
                   loginTipoPortal === 'SUPER_ADMIN'
-                    ? 'bg-slate-900 text-white border-slate-900 shadow-lg -translate-y-0.5'
-                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    ? 'bg-slate-900 text-white shadow-lg scale-110'
+                    : 'bg-slate-100/80 text-slate-500 hover:bg-white'
                 }`}
               >
-                <Lock className="w-5 h-5 mb-1.5" />
-                <div className="font-extrabold text-xs">Súper Admin</div>
-                <div className={`text-[10px] ${loginTipoPortal === 'SUPER_ADMIN' ? 'text-slate-300' : 'text-slate-500'}`}>
-                  Control Total Plataforma
-                </div>
+                <Lock className="w-5 h-5" />
               </button>
+            </div>
+            <div className="hidden md:flex w-9 h-9 rounded-full bg-emerald-100 text-[#34B37B] items-center justify-center">
+              <Compass className="w-4 h-4" />
             </div>
           </div>
 
-          {loginTipoPortal === 'CENTRAL_ART' && (
-            <div className="bg-blue-50/70 border border-blue-200 rounded-2xl p-3">
-              <label className="block text-[10px] font-bold text-[#1E588D] uppercase mb-1">Aseguradora (ART)</label>
-              <select
-                value={loginArtSeleccionada}
-                onChange={(e) => setLoginArtSeleccionada(e.target.value)}
-                className="w-full border border-blue-200 bg-white rounded-xl px-3 py-2 text-xs font-bold text-slate-800"
-              >
-                {tarifasArt.map((t) => (
-                  <option key={t.nombre_art} value={t.nombre_art}>{t.nombre_art}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {loginTipoPortal === 'PRESTADOR' && (
-            <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-3">
-              <label className="block text-[10px] font-bold text-emerald-800 uppercase mb-1">Empresa Prestadora</label>
-              <select
-                value={loginPrestadorSeleccionado}
-                onChange={(e) => setLoginPrestadorSeleccionado(e.target.value)}
-                className="w-full border border-emerald-200 bg-white rounded-xl px-3 py-2 text-xs font-bold text-slate-800"
-              >
-                {prestadores.map((p) => (
-                  <option key={p.id} value={p.id}>{p.razon_social} (CUIT {p.cuit})</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          <form onSubmit={handleLogin} className="space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Correo Corporativo</label>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder={loginTipoPortal === 'CENTRAL_ART' ? 'gestor@prevencionart.com.ar' : 'erquencisas@gmail.com'}
-                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-[#1E588D] outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Contraseña</label>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-[#1E588D] outline-none"
-                />
+          <div className="flex-1 p-6 sm:p-8 flex flex-col justify-between gap-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <ErquenciLogo subtitle="Ecosistema 3D de Traslados ART" />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => entrarPortalDemo('CENTRAL_ART', loginArtSeleccionada)}
+                  className="px-4 py-2 rounded-full bg-slate-900 hover:bg-[#1E588D] text-white text-[11px] font-bold shadow-md transition-all hover:-translate-y-0.5"
+                >
+                  DEMO CENTRAL ART
+                </button>
+                <button
+                  type="button"
+                  onClick={() => entrarPortalDemo('PRESTADOR', null, loginPrestadorSeleccionado)}
+                  className="px-4 py-2 rounded-full bg-gradient-to-r from-[#34B37B] to-[#268786] text-white text-[11px] font-bold shadow-md transition-all hover:-translate-y-0.5"
+                >
+                  DEMO PRESTADOR
+                </button>
               </div>
             </div>
-            {authError && <p className="text-xs text-rose-600 font-semibold">{authError}</p>}
-            <button
-              type="submit"
-              disabled={cargandoLogin}
-              className="w-full py-3 bg-gradient-to-r from-[#1E588D] to-[#268786] hover:opacity-95 text-white font-extrabold rounded-xl text-xs uppercase tracking-wider shadow-md transition cursor-pointer"
-            >
-              {cargandoLogin ? 'Verificando acceso...' : 'Iniciar Sesión Real'}
-            </button>
-          </form>
 
-          <div className="pt-3 border-t border-slate-200 space-y-2">
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center">
-              Presentación Comercial (Ingreso Demo en 1 Clic)
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => entrarPortalDemo('CENTRAL_ART', loginArtSeleccionada)}
-                className="py-2 px-3 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#1E588D] font-bold text-[11px] border border-blue-200 transition cursor-pointer"
-              >
-                Demo Central {loginArtSeleccionada.replace(' ART', '')}
-              </button>
-              <button
-                type="button"
-                onClick={() => entrarPortalDemo('PRESTADOR', null, loginPrestadorSeleccionado)}
-                className="py-2 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-[11px] border border-emerald-200 transition cursor-pointer"
-              >
-                Demo Prestador
-              </button>
-              <button
-                type="button"
-                onClick={() => entrarPortalDemo('SUPER_ADMIN')}
-                className="py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-[11px] border border-slate-300 transition cursor-pointer"
-              >
-                Demo Súper Admin
-              </button>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+              <div className="lg:col-span-7 space-y-4">
+                <div>
+                  <span className="text-[11px] font-extrabold uppercase tracking-widest text-[#268786]">
+                    Logística Médica Inteligente
+                  </span>
+                  <h1 className="text-2xl sm:text-3xl font-black text-slate-900 leading-tight mt-1">
+                    Control Total para{' '}
+                    <span className="bg-gradient-to-r from-[#34B37B] via-[#268786] to-[#1E588D] bg-clip-text text-transparent">
+                      ARTs y Prestadores
+                    </span>
+                  </h1>
+                  <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
+                    Derivación automática por terminación de siniestro, radar GPS en vivo, auditoría de flota y firma digital certificada en PDF.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setLoginTipoPortal('CENTRAL_ART')}
+                    className={`py-2 px-2.5 rounded-2xl text-[11px] font-extrabold border transition-all ${
+                      loginTipoPortal === 'CENTRAL_ART'
+                        ? 'bg-[#1E588D] text-white border-[#1E588D] shadow-md'
+                        : 'bg-white/70 text-slate-700 border-white hover:bg-white'
+                    }`}
+                  >
+                    Central ART
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLoginTipoPortal('PRESTADOR')}
+                    className={`py-2 px-2.5 rounded-2xl text-[11px] font-extrabold border transition-all ${
+                      loginTipoPortal === 'PRESTADOR'
+                        ? 'bg-[#34B37B] text-white border-[#34B37B] shadow-md'
+                        : 'bg-white/70 text-slate-700 border-white hover:bg-white'
+                    }`}
+                  >
+                    Portal Prestador
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLoginTipoPortal('SUPER_ADMIN')}
+                    className={`py-2 px-2.5 rounded-2xl text-[11px] font-extrabold border transition-all ${
+                      loginTipoPortal === 'SUPER_ADMIN'
+                        ? 'bg-slate-900 text-white border-slate-900 shadow-md'
+                        : 'bg-white/70 text-slate-700 border-white hover:bg-white'
+                    }`}
+                  >
+                    Súper Admin
+                  </button>
+                </div>
+
+                {loginTipoPortal === 'CENTRAL_ART' && (
+                  <select
+                    value={loginArtSeleccionada}
+                    onChange={(e) => setLoginArtSeleccionada(e.target.value)}
+                    className="w-full border border-white/80 bg-white/80 rounded-full px-4 py-2 text-xs font-bold text-[#1E588D] shadow-sm"
+                  >
+                    {tarifasArt.map((t) => (
+                      <option key={t.nombre_art} value={t.nombre_art}>{t.nombre_art}</option>
+                    ))}
+                  </select>
+                )}
+
+                {loginTipoPortal === 'PRESTADOR' && (
+                  <select
+                    value={loginPrestadorSeleccionado}
+                    onChange={(e) => setLoginPrestadorSeleccionado(e.target.value)}
+                    className="w-full border border-white/80 bg-white/80 rounded-full px-4 py-2 text-xs font-bold text-emerald-800 shadow-sm"
+                  >
+                    {prestadores.map((p) => (
+                      <option key={p.id} value={p.id}>{p.razon_social} (CUIT {p.cuit})</option>
+                    ))}
+                  </select>
+                )}
+
+                <form onSubmit={handleLogin} className="space-y-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder={loginTipoPortal === 'CENTRAL_ART' ? 'gestor@prevencionart.com.ar' : 'erquencisas@gmail.com'}
+                      className="w-full px-4 py-2.5 rounded-full bg-white/85 border border-white shadow-inner text-xs font-medium outline-none focus:ring-2 focus:ring-[#34B37B]"
+                    />
+                    <input
+                      type="password"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Contraseña"
+                      className="w-full px-4 py-2.5 rounded-full bg-white/85 border border-white shadow-inner text-xs font-medium outline-none focus:ring-2 focus:ring-[#34B37B]"
+                    />
+                  </div>
+                  {authError && <p className="text-xs text-rose-600 font-bold">{authError}</p>}
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <button
+                      type="submit"
+                      disabled={cargandoLogin}
+                      className="flex-1 py-2.5 px-6 rounded-full bg-slate-900 hover:bg-[#1E588D] text-white font-extrabold text-xs uppercase tracking-wider shadow-[0_10px_25px_rgba(15,23,42,0.3)] transition-all hover:-translate-y-0.5"
+                    >
+                      {cargandoLogin ? 'Ingresando...' : 'Iniciar Sesión Real'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => entrarPortalDemo('SUPER_ADMIN')}
+                      className="py-2.5 px-4 rounded-full bg-white/80 hover:bg-white text-slate-700 font-bold text-xs border border-white shadow-sm"
+                    >
+                      Demo Súper Admin
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <div className="lg:col-span-5 relative min-h-[260px] flex items-center justify-center">
+                <div className="relative w-full max-w-[290px] h-[250px]" style={{ perspective: '1000px' }}>
+                  <div
+                    className="absolute inset-x-4 top-8 p-5 rounded-3xl bg-gradient-to-br from-[#1E588D] via-[#268786] to-[#34B37B] text-white shadow-[0_25px_50px_rgba(30,88,141,0.4)] border border-white/30 animate-erq-float3d"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="px-2.5 py-0.5 rounded-full bg-white/20 text-[10px] font-bold">GPS EN VIVO</span>
+                      <Navigation className="w-5 h-5 text-emerald-200" />
+                    </div>
+                    <div className="text-lg font-black leading-snug">Radar Satelital ART</div>
+                    <div className="text-[11px] text-emerald-100 mt-1">
+                      Seguimiento de móviles, pacientes y firma digital en tiempo real.
+                    </div>
+                  </div>
+
+                  <div
+                    className="absolute -top-2 -left-2 px-3.5 py-2.5 rounded-2xl bg-white/95 shadow-[0_14px_30px_rgba(0,0,0,0.12)] border border-white flex items-center gap-2 animate-erq-float3d"
+                    style={{ animationDelay: '0.8s' }}
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-emerald-100 text-[#34B37B] flex items-center justify-center">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-extrabold text-slate-900">Terminación 0–9</div>
+                      <div className="text-[9px] text-slate-500">Auto-derivación</div>
+                    </div>
+                  </div>
+
+                  <div
+                    className="absolute -bottom-2 -right-2 px-3.5 py-2.5 rounded-2xl bg-white/95 shadow-[0_14px_30px_rgba(0,0,0,0.12)] border border-white flex items-center gap-2 animate-erq-float3d"
+                    style={{ animationDelay: '1.5s' }}
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-blue-100 text-[#1E588D] flex items-center justify-center">
+                      <FileText className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-extrabold text-slate-900">PDF Certificado</div>
+                      <div className="text-[9px] text-slate-500">Firma + Odómetro</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -3608,10 +3936,6 @@ export default function App() {
     );
   }
 
-  const trasladosLiquidacion =
-    filtroArtLiquidacion === 'TODAS'
-      ? trasladosVisiblesPortal
-      : trasladosVisiblesPortal.filter((t) => t.art_nombre === filtroArtLiquidacion);
   const totalFacturarFiltrado = +trasladosLiquidacion
     .reduce((acc, t) => acc + Number(t.importe_total || 0), 0)
     .toFixed(2);
@@ -3660,7 +3984,8 @@ export default function App() {
   const hayTrasladosLocalesSinImpactar = false;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen bg-slate-50 flex flex-col cursor-none">
+      <CursorTrianguloErquenci />
       <style>{`
         @keyframes erqTabEnter {
           0% { opacity: 0; transform: translateY(14px) scale(0.988); filter: blur(3px); }
@@ -3954,7 +4279,7 @@ export default function App() {
             >
               <DollarSign className="w-4 h-4" /> {portalActivo?.rol === 'PRESTADOR' ? 'Mi Liquidación' : 'Liquidación y Tarifas ART'}
             </button>
-            {(portalActivo?.rol === 'PRESTADOR' || portalActivo?.rol === 'SUPER_ADMIN') && (
+            {portalActivo?.rol === 'PRESTADOR' && (
               <button
                 onClick={() => cambiarTabAdmin('FLOTA')}
                 className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all duration-200 hover:-translate-y-0.5 ${
@@ -3983,6 +4308,7 @@ export default function App() {
               <MapaGeneralFlota
                 trasladosActivos={trasladosFiltradosTorre}
                 vehiculos={vehiculos}
+                prestadores={prestadores}
                 obtenerNombreChofer={(t) => obtenerChoferDeTraslado(t)?.nombre || 'Matías Emanuel Gatica'}
               />
 
@@ -4039,12 +4365,26 @@ export default function App() {
                     ))}
                   </select>
 
+                  {(portalActivo?.rol === 'CENTRAL_ART' || portalActivo?.rol === 'SUPER_ADMIN') && (
+                    <select
+                      value={filtroPrestadorTorre}
+                      onChange={(e) => setFiltroPrestadorTorre(e.target.value)}
+                      className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 font-semibold text-[#1E588D]"
+                    >
+                      <option value="TODOS">Todos los Prestadores</option>
+                      {prestadores.map((p) => (
+                        <option key={p.id} value={p.id}>{p.razon_social}</option>
+                      ))}
+                    </select>
+                  )}
+
                   <select
                     value={filtroEstadoTorre}
                     onChange={(e) => setFiltroEstadoTorre(e.target.value)}
                     className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 font-medium"
                   >
                     <option value="TODOS">Todos los Estados</option>
+                    <option value="PENDIENTE_ACEPTACION">Pendiente OK Prestador</option>
                     <option value="EN_CURSO">⚡ Solo Activos / En Curso</option>
                     <option value="ASIGNADO">Asignado</option>
                     <option value="EN_CAMINO_DOMICILIO">En Camino a Domicilio</option>
@@ -4228,6 +4568,15 @@ export default function App() {
                             </div>
 
                             <div className="flex flex-wrap items-center gap-1.5">
+                              {t.estado === 'PENDIENTE_ACEPTACION' && portalActivo?.rol === 'PRESTADOR' && (
+                                <button
+                                  type="button"
+                                  onClick={() => cambiarEstadoViaje(t.id, 'ASIGNADO')}
+                                  className="px-3 py-1.5 rounded-lg bg-[#34B37B] hover:bg-emerald-600 text-white font-extrabold text-[11px] flex items-center gap-1 shadow-sm animate-pulse"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5" /> Dar OK y Cargar
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={(e) => abrirModalEdicion(t, e)}
@@ -4507,7 +4856,31 @@ export default function App() {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">N° Siniestro / Autorización ART</label>
-                  <input required value={nuevoViaje.numero_siniestro} onChange={(e) => setNuevoViaje({ ...nuevoViaje, numero_siniestro: e.target.value })} className="w-full border rounded-xl px-3 py-2 text-sm" placeholder="3050702 (Aut. 5031009/9)" />
+                  <input
+                    required
+                    value={nuevoViaje.numero_siniestro}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const resTerm = obtenerPrestadorPorSiniestro(val);
+                      setNuevoViaje((prev) => ({
+                        ...prev,
+                        numero_siniestro: val,
+                        prestador_id: resTerm?.prestador?.id || prev.prestador_id,
+                      }));
+                    }}
+                    className="w-full border rounded-xl px-3 py-2 text-sm"
+                    placeholder="3050702 (Aut. 5031009/9)"
+                  />
+                  {(() => {
+                    const resTerm = obtenerPrestadorPorSiniestro(nuevoViaje.numero_siniestro);
+                    if (!resTerm) return null;
+                    return (
+                      <div className="text-[10px] font-bold mt-1 text-[#1E588D]">
+                        Terminación <strong>{resTerm.digito}</strong> →{' '}
+                        {resTerm.prestador ? `Asignado a ${resTerm.prestador.razon_social} (Pendiente OK)` : 'Sin prestador asignado a esta terminación'}
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Teléfono WhatsApp</label>
@@ -4802,7 +5175,7 @@ export default function App() {
                     }}
                     className="w-full border rounded-xl px-3 py-2 text-xs bg-white font-semibold"
                   >
-                    {vehiculos.map((v) => {
+                    {vehiculos.filter((v) => portalActivo?.rol !== 'PRESTADOR' || v.prestador_id === portalActivo.prestador_id).map((v) => {
                       const bloqueado = vehiculoEstaBloqueado(v);
                       return (
                         <option key={v.id} value={v.id} disabled={bloqueado}>
@@ -4900,15 +5273,29 @@ export default function App() {
                     Consultá todos los viajes realizados por cada paciente, sus condiciones habituales y repetí una orden en 1 clic.
                   </p>
                 </div>
-                <div className="relative w-full sm:w-72">
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
-                  <input
-                    type="text"
-                    value={busquedaHistorial}
-                    onChange={(e) => setBusquedaHistorial(e.target.value)}
-                    placeholder="Buscar paciente por nombre, DNI o ART..."
-                    className="w-full border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-xs bg-slate-50 focus:bg-white outline-none"
-                  />
+                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                  {(portalActivo?.rol === 'CENTRAL_ART' || portalActivo?.rol === 'SUPER_ADMIN') && (
+                    <select
+                      value={filtroPrestadorHistorial}
+                      onChange={(e) => setFiltroPrestadorHistorial(e.target.value)}
+                      className="border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold bg-slate-50 text-[#1E588D]"
+                    >
+                      <option value="TODOS">Todos los Prestadores</option>
+                      {prestadores.map((p) => (
+                        <option key={p.id} value={p.id}>{p.razon_social}</option>
+                      ))}
+                    </select>
+                  )}
+                  <div className="relative w-full sm:w-72">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      value={busquedaHistorial}
+                      onChange={(e) => setBusquedaHistorial(e.target.value)}
+                      placeholder="Buscar paciente por nombre, DNI o ART..."
+                      className="w-full border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-xs bg-slate-50 focus:bg-white outline-none"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -5031,13 +5418,15 @@ export default function App() {
                       Valores convenidos activos: Radio Céntrico Ida (Tramo 1) <strong>$5.630,04</strong> • Ida y Vuelta (Tramo 1 + Tramo 2) <strong>$11.260,08</strong> • Hora de Espera <strong>$5.630,04</strong> • Kilómetro Solo de Ida <strong>$656,85</strong>.
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={abrirNuevaArt}
-                    className="px-3.5 py-2 bg-[#1E588D] hover:bg-[#16426B] text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm"
-                  >
-                    <Plus className="w-4 h-4" /> Nueva ART
-                  </button>
+                  {portalActivo?.rol !== 'PRESTADOR' && (
+                    <button
+                      type="button"
+                      onClick={abrirNuevaArt}
+                      className="px-3.5 py-2 bg-[#1E588D] hover:bg-[#16426B] text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm"
+                    >
+                      <Plus className="w-4 h-4" /> Nueva ART
+                    </button>
+                  )}
                 </div>
 
                 {mostrarFormArt && (
@@ -5178,24 +5567,26 @@ export default function App() {
                             Convenio Activo
                           </span>
                         </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => abrirEditarArt(tar)}
-                            title="Editar ART"
-                            className="px-2 py-1 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 text-[#1E588D] font-bold flex items-center gap-1"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" /> Editar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => eliminarArt(tar)}
-                            title="Eliminar ART"
-                            className="px-2 py-1 rounded-lg bg-white border border-rose-200 hover:bg-rose-50 text-rose-600 font-bold flex items-center gap-1"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" /> Eliminar
-                          </button>
-                        </div>
+                        {portalActivo?.rol !== 'PRESTADOR' && (
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => abrirEditarArt(tar)}
+                              title="Editar ART"
+                              className="px-2 py-1 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 text-[#1E588D] font-bold flex items-center gap-1"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" /> Editar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => eliminarArt(tar)}
+                              title="Eliminar ART"
+                              className="px-2 py-1 rounded-lg bg-white border border-rose-200 hover:bg-rose-50 text-rose-600 font-bold flex items-center gap-1"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" /> Eliminar
+                            </button>
+                          </div>
+                        )}
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -5320,7 +5711,21 @@ export default function App() {
               <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <h3 className="font-bold text-sm text-slate-900">Planilla de Facturación Mensual</h3>
+                    <h3 className="font-bold text-sm text-slate-900">
+                      {portalActivo?.rol === 'CENTRAL_ART' ? 'Liquidación por Prestador' : 'Planilla de Facturación Mensual'}
+                    </h3>
+                    {(portalActivo?.rol === 'CENTRAL_ART' || portalActivo?.rol === 'SUPER_ADMIN') && (
+                      <select
+                        value={filtroPrestadorLiquidacion}
+                        onChange={(e) => setFiltroPrestadorLiquidacion(e.target.value)}
+                        className="border rounded-xl px-3 py-1.5 text-xs font-semibold bg-blue-50 text-[#1E588D]"
+                      >
+                        <option value="TODOS">Todos los Prestadores</option>
+                        {prestadores.map((p) => (
+                          <option key={p.id} value={p.id}>{p.razon_social}</option>
+                        ))}
+                      </select>
+                    )}
                     <select
                       value={filtroArtLiquidacion}
                       onChange={(e) => setFiltroArtLiquidacion(e.target.value)}
@@ -5605,20 +6010,22 @@ export default function App() {
                     Registrar Nuevo Vehículo en la Flota (Con los 5 Vencimientos Reglamentarios)
                   </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-500">Empresa Prestadora</label>
-                      <select
-                        value={nuevoVehiculo.prestador_id}
-                        onChange={(e) => setNuevoVehiculo({ ...nuevoVehiculo, prestador_id: e.target.value })}
-                        className="w-full border rounded-xl px-3 py-2 mt-0.5 bg-white"
-                      >
-                        {prestadores.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.razon_social}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    {portalActivo?.rol !== 'PRESTADOR' && (
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500">Empresa Prestadora</label>
+                        <select
+                          value={nuevoVehiculo.prestador_id}
+                          onChange={(e) => setNuevoVehiculo({ ...nuevoVehiculo, prestador_id: e.target.value })}
+                          className="w-full border rounded-xl px-3 py-2 mt-0.5 bg-white"
+                        >
+                          {prestadores.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.razon_social}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                     <div>
                       <label className="text-[10px] font-bold text-slate-500">Patente</label>
                       <input
@@ -5958,6 +6365,91 @@ export default function App() {
                           {p.domicilio_base || 'Av. Moreno 37, San Rafael'} (CP {p.codigo_postal_base || '5600'})
                         </span>
                       </div>
+                    </div>
+                  
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                      <span className="font-bold text-slate-700 block text-[11px]">
+                        🎯 Terminaciones de N° Siniestro Asignadas (0 al 9):
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((dig) => {
+                          const activo = (terminacionesPorPrestador[p.id] || []).includes(dig);
+                          return (
+                            <button
+                              key={dig}
+                              type="button"
+                              onClick={() => toggleTerminacionPrestador(p.id, dig)}
+                              className={`w-7 h-7 rounded-lg text-xs font-extrabold transition cursor-pointer ${
+                                activo
+                                  ? 'bg-[#1E588D] text-white shadow-sm'
+                                  : 'bg-white text-slate-500 border border-slate-300 hover:bg-slate-100'
+                              }`}
+                            >
+                              {dig}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setPrestadorExpandidoAudit(prestadorExpandidoAudit === p.id ? null : p.id)}
+                        className="w-full py-2 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold flex items-center justify-between border border-emerald-200"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Truck className="w-3.5 h-3.5" />
+                          Ver Flota y Choferes ({vehiculos.filter((v) => v.prestador_id === p.id).length} móviles • {choferes.filter((c) => c.prestador_id === p.id).length} choferes)
+                        </span>
+                        <span>{prestadorExpandidoAudit === p.id ? '▲ Ocultar' : '▼ Ver Detalle'}</span>
+                      </button>
+
+                      {prestadorExpandidoAudit === p.id && (
+                        <div className="mt-2 p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5 text-xs">
+                          <div>
+                            <div className="font-bold text-[#1E588D] mb-1">Vehículos y Vencimientos:</div>
+                            {vehiculos.filter((v) => v.prestador_id === p.id).length === 0 ? (
+                              <div className="text-slate-400 italic">Sin vehículos cargados por este prestador.</div>
+                            ) : (
+                              vehiculos
+                                .filter((v) => v.prestador_id === p.id)
+                                .map((v) => (
+                                  <div key={v.id} className="p-2 bg-white rounded-lg border border-slate-200 mb-1.5">
+                                    <div className="font-bold text-slate-900 flex justify-between">
+                                      <span>{v.patente} — {v.modelo}</span>
+                                      <span className={vehiculoEstaBloqueado(v) ? 'text-rose-600' : 'text-emerald-700'}>
+                                        {vehiculoEstaBloqueado(v) ? 'BLOQUEADO' : 'APTO'}
+                                      </span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                      {normalizarDocsVehiculo(v.docs).map((d) => (
+                                        <span key={d.tipo} className="px-1.5 py-0.5 rounded bg-slate-100 text-[10px] text-slate-600">
+                                          {d.tipo.slice(0, 4)}: {d.vencimiento}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))
+                            )}
+                          </div>
+                          <div>
+                            <div className="font-bold text-emerald-800 mb-1">Choferes:</div>
+                            {choferes.filter((c) => c.prestador_id === p.id).length === 0 ? (
+                              <div className="text-slate-400 italic">Sin choferes cargados.</div>
+                            ) : (
+                              choferes
+                                .filter((c) => c.prestador_id === p.id)
+                                .map((c) => (
+                                  <div key={c.id} className="flex justify-between p-1.5 bg-white rounded-lg border border-slate-200 mb-1">
+                                    <span className="font-semibold text-slate-800">{c.nombre} (DNI {c.dni})</span>
+                                    <span className="text-[10px] text-slate-500">Lic: {c.licencia_venc}</span>
+                                  </div>
+                                ))
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -6719,6 +7211,8 @@ export default function App() {
                   <div><strong>Llevar a:</strong> {viajeActivo.destino_nombre}</div>
                   <div><strong>Modalidad:</strong> {viajeActivo.modalidad_viaje === 'IDA_VUELTA' ? 'Ida y Vuelta' : 'Solo Ida'}</div>
                 </div>
+
+                <MapaNavegacionChofer viaje={viajeActivo} prestador={prestadorAsignado} />
 
                 <div className="grid grid-cols-2 gap-2">
                   <button
