@@ -1984,10 +1984,13 @@ export default function App() {
       }
 
       if (resVeh.data && resVeh.data.length > 0) {
+        let fotosVehLocal = {};
+        try { fotosVehLocal = JSON.parse(localStorage.getItem('erquenci_vehiculos_fotos_v1') || '{}'); } catch (e) {}
         const vehNorm = resVeh.data.map((v) => ({
           ...v,
           patente: v.patente === 'AE 842 KL' ? 'AB 635 BN' : v.patente,
           chofer_nombre: v.chofer_nombre === 'Martín Rodríguez' ? 'Matías Emanuel Gatica' : v.chofer_nombre,
+          foto_url: v.foto_url || fotosVehLocal[v.id] || null,
           docs: normalizarDocsVehiculo(v.docs),
         }));
         setVehiculos(vehNorm);
@@ -2645,6 +2648,31 @@ export default function App() {
         guardandoEstadoRef.current = false;
       }
     }
+  };
+
+  const obtenerEstadisticasChofer = (choferId, choferNombre = '') => {
+    const calificados = traslados.filter((t) => {
+      const m = obtenerMetaTraslado(t);
+      if (!m.calificacion_estrellas) return false;
+      if (choferId && m.chofer_id && m.chofer_id === choferId) return true;
+      const veh = vehiculos.find((v) => v.id === t.vehiculo_id);
+      if (choferId && veh?.chofer_id === choferId) return true;
+      if (choferNombre && (m.chofer_nombre_snap || '').toLowerCase() === choferNombre.toLowerCase()) return true;
+      return false;
+    });
+    if (calificados.length === 0) return { promedio: null, cantidad: 0, resenas: [] };
+    const suma = calificados.reduce((acc, t) => acc + Number(obtenerMetaTraslado(t).calificacion_estrellas || 0), 0);
+    return {
+      promedio: (suma / calificados.length).toFixed(1),
+      cantidad: calificados.length,
+      resenas: calificados.map((t) => ({
+        id: t.id,
+        paciente: t.paciente_nombre,
+        estrellas: Number(obtenerMetaTraslado(t).calificacion_estrellas),
+        resena: obtenerMetaTraslado(t).calificacion_resena || '',
+        fecha: t.fecha_programada,
+      })),
+    };
   };
 
   const calificarTrasladoPaciente = async (viaje, estrellas, resena) => {
@@ -3514,7 +3542,15 @@ export default function App() {
     const patchExt = {
       ...patchBase,
       chofer_id: ch?.id || null,
+      foto_url: vehiculoEditando.foto_url || null,
     };
+    try {
+      const fotosMap = JSON.parse(localStorage.getItem('erquenci_vehiculos_fotos_v1') || '{}');
+      if (vehiculoEditando.foto_url) {
+        fotosMap[vehiculoEditando.id] = vehiculoEditando.foto_url;
+        localStorage.setItem('erquenci_vehiculos_fotos_v1', JSON.stringify(fotosMap));
+      }
+    } catch (e) {}
 
     let { error } = await supabase.from('vehiculos').update(patchExt).eq('id', vehiculoEditando.id);
     if (error) {
@@ -4047,8 +4083,17 @@ export default function App() {
   const hayTrasladosLocalesSinImpactar = false;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen relative overflow-x-hidden bg-gradient-to-br from-slate-100 via-teal-50/60 to-blue-100/75 flex flex-col">
       <CursorTrianguloErquenci />
+      {/* Esferas 3D ambientales en colores del logo para todas las interfaces */}
+      <div
+        className="fixed -top-24 -right-24 w-80 h-80 rounded-full pointer-events-none opacity-35 blur-2xl z-0"
+        style={{ background: 'radial-gradient(circle at 30% 30%, #38bdf8, #1E588D 70%, transparent 100%)' }}
+      />
+      <div
+        className="fixed -bottom-24 -left-24 w-96 h-96 rounded-full pointer-events-none opacity-30 blur-2xl z-0"
+        style={{ background: 'radial-gradient(circle at 35% 30%, #6ee7b7, #34B37B 65%, transparent 100%)' }}
+      />
       <style>{`
         @keyframes erqTabEnter {
           0% { opacity: 0; transform: translateY(14px) scale(0.988); filter: blur(3px); }
@@ -4079,6 +4124,16 @@ export default function App() {
         .animate-erq-float {
           animation: erqFloatSlow 5s ease-in-out infinite;
         }
+        main .bg-white.rounded-2xl {
+          background-color: rgba(255, 255, 255, 0.84) !important;
+          backdrop-filter: blur(14px);
+          border-color: rgba(255, 255, 255, 0.9) !important;
+          box-shadow: 0 12px 32px rgba(30, 88, 141, 0.08), 0 2px 6px rgba(52, 179, 123, 0.06);
+          transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 220ms ease;
+        }
+        main .bg-white.rounded-2xl:hover {
+          box-shadow: 0 18px 42px rgba(30, 88, 141, 0.13), 0 4px 12px rgba(52, 179, 123, 0.09);
+        }
       `}</style>
 
       {/* BARRA DE PROGRESO SUPERIOR AL CAMBIAR DE PESTAÑA O VISTA */}
@@ -4096,7 +4151,7 @@ export default function App() {
       )}
 
       {/* BARRA SUPERIOR */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+      <header className="bg-white/80 backdrop-blur-xl border-b border-white/80 sticky top-0 z-30 shadow-[0_6px_25px_rgba(30,88,141,0.08)]">
         <div className="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
           <ErquenciLogo
             subtitle={
@@ -4318,6 +4373,66 @@ export default function App() {
                 prestadores={prestadores}
                 obtenerNombreChofer={(t) => obtenerChoferDeTraslado(t)?.nombre || 'Matías Emanuel Gatica'}
               />
+
+              {/* GRÁFICA DE ESTRELLAS Y RESEÑAS PARA PORTAL PRESTADOR */}
+              {(portalActivo?.rol === 'PRESTADOR' || portalActivo?.rol === 'SUPER_ADMIN') && (() => {
+                const califs = trasladosVisiblesPortal
+                  .map((t) => ({ t, m: obtenerMetaTraslado(t) }))
+                  .filter((x) => x.m.calificacion_estrellas);
+                const totalCal = califs.length;
+                const prom = totalCal > 0
+                  ? (califs.reduce((a, x) => a + Number(x.m.calificacion_estrellas), 0) / totalCal).toFixed(1)
+                  : '5.0';
+                return (
+                  <div className="bg-white rounded-2xl border border-slate-200 p-4 grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                    <div className="flex items-center gap-3">
+                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-500 text-white flex flex-col items-center justify-center shadow-lg">
+                        <span className="text-lg font-black leading-none">{prom}</span>
+                        <span className="text-[10px] font-bold">★ PROM</span>
+                      </div>
+                      <div>
+                        <h4 className="font-extrabold text-xs text-slate-900">Calificación y Reseñas de Pacientes</h4>
+                        <p className="text-[11px] text-slate-500">
+                          {totalCal > 0 ? `${totalCal} viaje(s) calificado(s)` : 'Aún sin reseñas registradas (base 5.0 ★)'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      {[5, 4, 3, 2, 1].map((star) => {
+                        const cnt = califs.filter((x) => Number(x.m.calificacion_estrellas) === star).length;
+                        const pct = totalCal > 0 ? Math.round((cnt / totalCal) * 100) : 0;
+                        return (
+                          <div key={star} className="flex items-center gap-2 text-[10px]">
+                            <span className="w-6 font-bold text-amber-600">{star}★</span>
+                            <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-gradient-to-r from-amber-400 to-[#34B37B] rounded-full transition-all duration-500"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <span className="w-6 text-right font-semibold text-slate-500">{cnt}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="max-h-24 overflow-y-auto space-y-1.5 text-[11px]">
+                      {califs.length === 0 ? (
+                        <div className="text-slate-400 italic">Cuando los pacientes califiquen al finalizar, verás sus reseñas aquí.</div>
+                      ) : (
+                        califs.slice(0, 4).map((x) => (
+                          <div key={x.t.id} className="p-2 rounded-xl bg-amber-50/70 border border-amber-200/70">
+                            <span className="font-bold text-amber-700">{'★'.repeat(x.m.calificacion_estrellas)}</span>{' '}
+                            <span className="font-semibold text-slate-800">{x.t.paciente_nombre}:</span>{' '}
+                            <span className="italic text-slate-600">"{x.m.calificacion_resena || 'Excelente servicio'}"</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* BARRA DE BUSCADOR Y FILTROS AVANZADOS */}
               <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3 shadow-sm">
@@ -6244,7 +6359,17 @@ export default function App() {
                               className="w-12 h-12 rounded-full object-cover border-2 border-[#34B37B]"
                             />
                             <div>
-                              <h4 className="font-bold text-sm text-slate-900">{c.nombre}</h4>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <h4 className="font-bold text-sm text-slate-900">{c.nombre}</h4>
+                                {(() => {
+                                  const st = obtenerEstadisticasChofer(c.id, c.nombre);
+                                  return (
+                                    <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-extrabold">
+                                      ★ {st.promedio || '5.0'} {st.cantidad > 0 ? `(${st.cantidad})` : ''}
+                                    </span>
+                                  );
+                                })()}
+                              </div>
                               <p className="text-[11px] text-slate-500">{prest?.razon_social || 'Erquenci S.A.S.'}</p>
                               <p className="text-[11px] text-slate-500">
                                 DNI: {c.dni || 'S/D'} • Tel: {c.telefono || 'S/T'}
@@ -6408,9 +6533,133 @@ export default function App() {
             </div>
           )}
 
-          {/* PESTAÑA 6: PRESTADORES Y DOMICILIO DE BASE OPERATIVA */}
+          {/* PESTAÑA 6: PRESTADORES, GRÁFICAS DE AUDITORÍA Y BASE OPERATIVA */}
           {tabAdmin === 'PRESTADORES' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-6">
+              {/* PANEL GRÁFICO CENTRAL ART: ESTRELLAS DE CHOFERES + VENCIMIENTOS DE FLOTA + FOTOS DE AUTOS */}
+              {(() => {
+                let vigentes = 0;
+                let porVencer = 0;
+                let vencidos = 0;
+                vehiculos.forEach((v) => {
+                  normalizarDocsVehiculo(v.docs).forEach((d) => {
+                    const ev = evaluarVencimiento(d.vencimiento);
+                    if (ev.bloqueado) vencidos++;
+                    else if (ev.dias <= 30) porVencer++;
+                    else vigentes++;
+                  });
+                });
+                choferes.forEach((c) => {
+                  const ev = evaluarVencimiento(c.licencia_venc);
+                  if (ev.bloqueado) vencidos++;
+                  else if (ev.dias <= 30) porVencer++;
+                  else vigentes++;
+                });
+                const totalDocs = Math.max(1, vigentes + porVencer + vencidos);
+                return (
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    {/* Gráfica 1: Estrellas de todos los Choferes */}
+                    <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-2.5">
+                      <h4 className="font-bold text-xs text-[#1E588D] uppercase flex items-center gap-1.5">
+                        ★ Ranking Estrellas de Choferes ({choferes.length})
+                      </h4>
+                      <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                        {choferes.map((c) => {
+                          const st = obtenerEstadisticasChofer(c.id, c.nombre);
+                          const val = Number(st.promedio || 5);
+                          const prest = prestadores.find((p) => p.id === c.prestador_id);
+                          return (
+                            <div key={c.id} className="space-y-1">
+                              <div className="flex items-center justify-between text-[11px]">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <img
+                                    src={c.foto_url || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face'}
+                                    alt={c.nombre}
+                                    className="w-6 h-6 rounded-full object-cover border border-[#34B37B]"
+                                  />
+                                  <span className="font-bold text-slate-800 truncate">{c.nombre}</span>
+                                  <span className="text-[9px] text-slate-400 truncate">({prest?.razon_social || 'Prestador'})</span>
+                                </div>
+                                <span className="font-extrabold text-amber-600 shrink-0">★ {val.toFixed(1)}</span>
+                              </div>
+                              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-gradient-to-r from-[#34B37B] via-amber-400 to-[#1E588D] rounded-full transition-all duration-500"
+                                  style={{ width: `${(val / 5) * 100}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Gráfica 2: Vencimientos de Flota y Licencias */}
+                    <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+                      <h4 className="font-bold text-xs text-[#1E588D] uppercase">
+                        📊 Gráfica de Vencimientos (Flota y Licencias)
+                      </h4>
+                      <div className="space-y-2.5 text-xs">
+                        <div>
+                          <div className="flex justify-between font-bold text-emerald-700 mb-1">
+                            <span>Al Día / Vigentes</span>
+                            <span>{vigentes} ({Math.round((vigentes / totalDocs) * 100)}%)</span>
+                          </div>
+                          <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-[#34B37B] rounded-full" style={{ width: `${(vigentes / totalDocs) * 100}%` }} />
+                          </div>
+                        </div>
+                        <div>
+                          <div className="flex justify-between font-bold text-amber-700 mb-1">
+                            <span>Por Vencer (&lt;30 días)</span>
+                            <span>{porVencer} ({Math.round((porVencer / totalDocs) * 100)}%)</span>
+                          </div>
+                          <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-amber-400 rounded-full" style={{ width: `${(porVencer / totalDocs) * 100}%` }} />
+                          </div>
+                        </div>
+                        <div>
+                          <div className="flex justify-between font-bold text-rose-700 mb-1">
+                            <span>Vencidos / Bloqueados</span>
+                            <span>{vencidos} ({Math.round((vencidos / totalDocs) * 100)}%)</span>
+                          </div>
+                          <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-rose-500 rounded-full" style={{ width: `${(vencidos / totalDocs) * 100}%` }} />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Galería 3: Fotos de Autos Cargadas por los Prestadores */}
+                    <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-2.5">
+                      <h4 className="font-bold text-xs text-[#1E588D] uppercase">
+                        🚗 Unidades Habilitadas ({vehiculos.length})
+                      </h4>
+                      <div className="grid grid-cols-2 gap-2 max-h-44 overflow-y-auto pr-1">
+                        {vehiculos.map((v) => {
+                          const prest = prestadores.find((p) => p.id === v.prestador_id);
+                          return (
+                            <div key={v.id} className="rounded-xl border border-slate-200 overflow-hidden bg-slate-50">
+                              <img
+                                src={v.foto_url || 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?w=240&h=140&fit=crop'}
+                                alt={v.patente}
+                                className="w-full h-16 object-cover"
+                              />
+                              <div className="p-1.5 text-[10px]">
+                                <div className="font-extrabold text-slate-900 truncate">{v.patente}</div>
+                                <div className="text-slate-500 truncate">{v.modelo}</div>
+                                <div className="text-[#1E588D] font-semibold truncate">{prest?.razon_social}</div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-3">
                 {prestadores.map((p) => (
                   <div key={p.id} className="bg-white p-4 rounded-2xl border border-slate-200 space-y-2 shadow-xs">
@@ -6543,6 +6792,9 @@ export default function App() {
                                         className="w-8 h-8 rounded-full object-cover border border-emerald-400 shrink-0"
                                       />
                                       <span className="font-semibold text-slate-800 truncate">{c.nombre} (DNI {c.dni})</span>
+                                      <span className="px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-extrabold shrink-0">
+                                        ★ {obtenerEstadisticasChofer(c.id, c.nombre).promedio || '5.0'}
+                                      </span>
                                     </div>
                                     <span className="text-[10px] text-slate-500 shrink-0">Lic: {c.licencia_venc}</span>
                                   </div>
@@ -6662,6 +6914,7 @@ export default function App() {
                   {buscandoGeo ? 'Ubicando Base GPS...' : 'Homologar Prestador en Supabase'}
                 </button>
               </form>
+              </div>
             </div>
           )}
           </div>
@@ -6713,6 +6966,29 @@ export default function App() {
                     <option value="UTILITARIO_ADAPTADO">Utilitario / Rampa Adaptado</option>
                     <option value="AMBULATORIO">Ambulatorio Estándar</option>
                   </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="font-bold text-slate-600 block mb-1">Foto del Vehículo</label>
+                  <div className="flex items-center gap-3">
+                    {vehiculoEditando.foto_url && (
+                      <img src={vehiculoEditando.foto_url} alt="Auto" className="w-16 h-12 rounded-xl object-cover border border-slate-200 shadow-xs" />
+                    )}
+                    <label className="cursor-pointer px-3 py-2 rounded-xl bg-slate-100 hover:bg-blue-50 text-[#1E588D] font-bold text-[11px] flex items-center gap-1.5 border border-slate-200">
+                      <Camera className="w-3.5 h-3.5" /> {vehiculoEditando.foto_url ? 'Cambiar Foto del Auto' : 'Cargar Foto del Auto'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (!f) return;
+                          leerArchivoBase64(f, (b64) =>
+                            setVehiculoEditando((prev) => (prev ? { ...prev, foto_url: b64 } : prev))
+                          );
+                        }}
+                      />
+                    </label>
+                  </div>
                 </div>
                 <div>
                   <label className="font-bold text-slate-600">Chofer Asignado</label>
