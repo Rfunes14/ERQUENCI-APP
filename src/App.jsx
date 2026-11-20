@@ -2405,14 +2405,14 @@ export default function App() {
   };
 
   const entrarPortalDemo = (tipo, artNom = loginArtSeleccionada, prestId = loginPrestadorSeleccionado) => {
-    dispararBarraTransicion();
+    setSplashEstado('OCULTO');
     setModoDemo(true);
     setRolActivo('CENTRAL_ART');
     setTabAdmin('TORRE');
     if (tipo === 'CENTRAL_ART') {
       setPortalActivo({ rol: 'CENTRAL_ART', nombre: `Central ${artNom}`, art_nombre: artNom, prestador_id: null, demo: true });
     } else if (tipo === 'PRESTADOR') {
-      const pObj = prestadores.find((p) => p.id === prestId);
+      const pObj = (prestadores || []).find((p) => p.id === prestId);
       setPortalActivo({
         rol: 'PRESTADOR',
         nombre: pObj?.razon_social || 'Erquenci S.A.S.',
@@ -2423,6 +2423,7 @@ export default function App() {
     } else {
       setPortalActivo({ rol: 'SUPER_ADMIN', nombre: 'Súper Admin Erquenci', art_nombre: null, prestador_id: null, demo: true });
     }
+    dispararBarraTransicion();
   };
 
   const handleLogin = async (e) => {
@@ -3629,7 +3630,7 @@ export default function App() {
   // PANTALLA DE PORTADA 3D GLASSMORPHISM Y LOGIN DUAL (ESTILO MODERNO COLORES LOGO ERQUENCI)
   if (!portalActivo && !esAccesoExclusivoPaciente && !esAccesoExclusivoChofer) {
     return (
-      <div className="min-h-screen relative flex items-center justify-center overflow-hidden bg-gradient-to-br from-slate-100 via-teal-50/80 to-blue-100/90 p-3 sm:p-6 cursor-none">
+      <div className="min-h-screen relative flex items-center justify-center overflow-hidden bg-gradient-to-br from-slate-100 via-teal-50/80 to-blue-100/90 p-3 sm:p-6">
         <CursorTrianguloErquenci />
         <style>{`
           @keyframes erqFloat3d {
@@ -3984,7 +3985,7 @@ export default function App() {
   const hayTrasladosLocalesSinImpactar = false;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col cursor-none">
+    <div className="min-h-screen bg-slate-50 flex flex-col">
       <CursorTrianguloErquenci />
       <style>{`
         @keyframes erqTabEnter {
@@ -4025,62 +4026,6 @@ export default function App() {
         </div>
       )}
 
-      {/* SPLASH SCREEN PROFESIONAL CON BOTÓN DE INGRESO */}
-      {splashEstado !== 'OCULTO' && (
-        <div
-          className={`fixed inset-0 z-[70] flex flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-slate-950 via-[#0d243c] to-[#0b3330] text-white transition-all duration-500 ${
-            splashEstado === 'SALIENDO' ? 'opacity-0 scale-105 pointer-events-none' : 'opacity-100 scale-100'
-          }`}
-        >
-          {/* Orbes ambientales animados */}
-          <div className="absolute -top-24 -left-24 w-80 h-80 rounded-full bg-[#34B37B]/20 blur-3xl animate-erq-float pointer-events-none" />
-          <div className="absolute -bottom-24 -right-24 w-96 h-96 rounded-full bg-[#1E588D]/30 blur-3xl animate-erq-float pointer-events-none" />
-
-          <div className="relative z-10 flex flex-col items-center gap-5 px-6 max-w-md w-full text-center">
-            <div className="bg-white/95 px-7 py-5 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.45)] border border-white/30 transform transition-transform duration-500 hover:scale-[1.02]">
-              <ErquenciLogo subtitle="Plataforma Operativa ART • GPS en Vivo" />
-            </div>
-
-            <div className="w-full max-w-xs space-y-2 mt-1">
-              <div className="flex items-center justify-between text-[11px] font-bold tracking-wider uppercase text-emerald-200/90">
-                <span className="flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full ${splashProgreso < 100 ? 'bg-amber-400 animate-ping' : 'bg-[#34B37B]'}`} />
-                  {splashProgreso < 50
-                    ? 'Conectando con Supabase...'
-                    : splashProgreso < 100
-                    ? 'Sincronizando flota y traslados...'
-                    : 'Sistema Operativo Listo'}
-                </span>
-                <span>{splashProgreso}%</span>
-              </div>
-              <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden border border-white/10">
-                <div
-                  className="h-full bg-gradient-to-r from-[#34B37B] via-[#38bdf8] to-[#1E588D] rounded-full transition-all duration-300 ease-out shadow-[0_0_12px_rgba(52,179,123,0.75)]"
-                  style={{ width: `${splashProgreso}%` }}
-                />
-              </div>
-            </div>
-
-            {splashProgreso === 100 && (
-              <button
-                type="button"
-                onClick={ingresarDesdeSplash}
-                className="animate-erq-btn-enter mt-2 group relative inline-flex items-center justify-center gap-2.5 px-7 py-3.5 rounded-2xl font-extrabold text-xs sm:text-sm tracking-wider uppercase text-white bg-gradient-to-r from-[#34B37B] via-[#268786] to-[#1E588D] shadow-[0_12px_35px_rgba(52,179,123,0.45)] hover:shadow-[0_16px_45px_rgba(56,189,248,0.55)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 border border-white/25 cursor-pointer"
-              >
-                <ShieldCheck className="w-5 h-5 text-emerald-100 group-hover:scale-110 transition-transform" />
-                <span>
-                  {esAccesoExclusivoChofer
-                    ? 'INGRESAR A MI HOJA DE RUTA'
-                    : esAccesoExclusivoPaciente
-                    ? 'VER SEGUIMIENTO DEL TRASLADO'
-                    : 'INGRESAR A LA TORRE DE CONTROL'}
-                </span>
-                <Navigation className="w-4 h-4 rotate-90 group-hover:translate-x-1 transition-transform" />
-              </button>
-            )}
-          </div>
-        </div>
-      )}
       {linkCopiadoMsg && (
         <div className="fixed bottom-4 right-4 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-xl text-xs font-bold flex items-center gap-2 border border-[#34B37B]">
           <CheckCircle2 className="w-4 h-4 text-[#34B37B]" />
