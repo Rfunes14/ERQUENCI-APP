@@ -1141,18 +1141,35 @@ export default function App() {
   const choferIdUrl = params.get('chofer');
   const trasladoIdUrl = params.get('traslado');
   const modoUrl = params.get('modo');
+  const portalUrl = params.get('portal'); // 'art' | 'prestador' | 'admin'
+  const artUrl = params.get('art') || 'Prevención ART';
+  const prestadorIdUrl = params.get('prestador_id') || '22222222-2222-2222-2222-222222222221';
 
   const esAccesoExclusivoPaciente = Boolean(pacienteTokenUrl || modoUrl === 'paciente');
   const esAccesoExclusivoChofer = Boolean(choferIdUrl || modoUrl === 'chofer');
 
+  const portalInicial =
+    portalUrl === 'art'
+      ? { rol: 'CENTRAL_ART', nombre: `Central ${artUrl}`, art_nombre: artUrl, prestador_id: null, demo: true }
+      : portalUrl === 'prestador'
+      ? { rol: 'PRESTADOR', nombre: 'Erquenci S.A.S.', art_nombre: null, prestador_id: prestadorIdUrl, demo: true }
+      : portalUrl === 'admin'
+      ? { rol: 'SUPER_ADMIN', nombre: 'Súper Admin Erquenci', art_nombre: null, prestador_id: null, demo: true }
+      : null;
+
   const [session, setSession] = useState(null);
-  const [modoDemo, setModoDemo] = useState(true);
+  const [portalActivo, setPortalActivo] = useState(portalInicial);
+  const [loginTipoPortal, setLoginTipoPortal] = useState('CENTRAL_ART');
+  const [loginArtSeleccionada, setLoginArtSeleccionada] = useState('Prevención ART');
+  const [loginPrestadorSeleccionado, setLoginPrestadorSeleccionado] = useState('22222222-2222-2222-2222-222222222221');
+  const [modoDemo, setModoDemo] = useState(Boolean(portalInicial));
   const [rolActivo, setRolActivo] = useState(
     esAccesoExclusivoPaciente ? 'PACIENTE' : esAccesoExclusivoChofer ? 'CHOFER' : 'CENTRAL_ART'
   );
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
+  const [cargandoLogin, setCargandoLogin] = useState(false);
   const [sincronizandoDb, setSincronizandoDb] = useState(false);
 
   // ============================================================================
@@ -2154,11 +2171,77 @@ export default function App() {
     setCentrosMedicos((prev) => prev.filter((item) => item.id !== cm.id));
   };
 
+  const entrarPortalDemo = (tipo, artNom = loginArtSeleccionada, prestId = loginPrestadorSeleccionado) => {
+    dispararBarraTransicion();
+    setModoDemo(true);
+    setRolActivo('CENTRAL_ART');
+    setTabAdmin('TORRE');
+    if (tipo === 'CENTRAL_ART') {
+      setPortalActivo({ rol: 'CENTRAL_ART', nombre: `Central ${artNom}`, art_nombre: artNom, prestador_id: null, demo: true });
+    } else if (tipo === 'PRESTADOR') {
+      const pObj = prestadores.find((p) => p.id === prestId);
+      setPortalActivo({
+        rol: 'PRESTADOR',
+        nombre: pObj?.razon_social || 'Erquenci S.A.S.',
+        art_nombre: null,
+        prestador_id: prestId,
+        demo: true,
+      });
+    } else {
+      setPortalActivo({ rol: 'SUPER_ADMIN', nombre: 'Súper Admin Erquenci', art_nombre: null, prestador_id: null, demo: true });
+    }
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setAuthError('');
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setAuthError('Credenciales inválidas o usuario no registrado en Supabase Auth.');
+    setCargandoLogin(true);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (error) {
+        setAuthError('Credenciales inválidas o usuario no registrado en Supabase Auth.');
+        return;
+      }
+      const userEmail = data?.user?.email || email.trim();
+      const { data: perfil } = await supabase
+        .from('usuarios_portal')
+        .select('*')
+        .eq('email', userEmail)
+        .maybeSingle();
+
+      if (perfil) {
+        setPortalActivo({
+          rol: perfil.rol,
+          nombre: perfil.nombre_completo,
+          art_nombre: perfil.art_nombre,
+          prestador_id: perfil.prestador_id,
+          demo: false,
+        });
+      } else {
+        entrarPortalDemo(loginTipoPortal);
+        setPortalActivo((prev) => (prev ? { ...prev, demo: false, nombre: userEmail } : prev));
+      }
+      setModoDemo(false);
+      setRolActivo('CENTRAL_ART');
+      setTabAdmin('TORRE');
+    } finally {
+      setCargandoLogin(false);
+    }
+  };
+
+  const copiarLinkPortal = (tipo) => {
+    const base = window.location.origin + window.location.pathname;
+    const url =
+      tipo === 'CENTRAL_ART'
+        ? `${base}?portal=art&art=${encodeURIComponent(portalActivo?.art_nombre || 'Prevención ART')}`
+        : `${base}?portal=prestador&prestador_id=${encodeURIComponent(portalActivo?.prestador_id || '22222222-2222-2222-2222-222222222221')}`;
+    navigator.clipboard?.writeText(url);
+    setLinkCopiadoMsg(
+      tipo === 'CENTRAL_ART'
+        ? 'Link de Central ART copiado para compartir con gestores'
+        : 'Link del Portal Prestador copiado'
+    );
+    setTimeout(() => setLinkCopiadoMsg(''), 3200);
   };
 
   const vehiculoEstaBloqueado = (v) => {
@@ -2168,8 +2251,19 @@ export default function App() {
     return licVencida || docVencido;
   };
 
+  // Alcance de traslados según Portal Activo (Central ART vs Prestador vs Súper Admin)
+  const trasladosVisiblesPortal = traslados.filter((t) => {
+    if (portalActivo?.rol === 'CENTRAL_ART' && portalActivo.art_nombre) {
+      return (t.art_nombre || '').toLowerCase() === portalActivo.art_nombre.toLowerCase();
+    }
+    if (portalActivo?.rol === 'PRESTADOR' && portalActivo.prestador_id) {
+      return t.prestador_id === portalActivo.prestador_id;
+    }
+    return true;
+  });
+
   // Filtrado de traslados en Torre de Control
-  const trasladosFiltradosTorre = traslados.filter((t) => {
+  const trasladosFiltradosTorre = trasladosVisiblesPortal.filter((t) => {
     const cond = obtenerMetaTraslado(t);
     const veh = vehiculos.find((v) => v.id === t.vehiculo_id);
     const ch = obtenerChoferDeTraslado(t);
@@ -3293,47 +3387,221 @@ export default function App() {
     await supabase.from('tarifas_art').delete().eq('nombre_art', tar.nombre_art);
   };
 
-  // PANTALLA DE LOGIN REAL
-  if (!modoDemo && !session && !esAccesoExclusivoPaciente && !esAccesoExclusivoChofer) {
+  // PANTALLA DE PORTADA Y LOGIN DUAL (CENTRAL ART / PRESTADOR / SÚPER ADMIN)
+  if (!portalActivo && !esAccesoExclusivoPaciente && !esAccesoExclusivoChofer) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 via-teal-50/40 to-blue-100/50 p-4">
-        <div className="bg-white max-w-md w-full rounded-2xl shadow-xl border border-slate-200 p-8 space-y-6">
-          <ErquenciLogo subtitle="Acceso Corporativo Seguro" />
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Correo Institucional</label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="operaciones@erquenci.com.ar"
-                className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-[#1E588D] outline-none"
-              />
+      <div className="min-h-screen relative flex items-center justify-center overflow-hidden bg-gradient-to-br from-slate-950 via-[#0d243c] to-[#0b3330] p-4">
+        <style>{`
+          @keyframes erqFloatSlow {
+            0%, 100% { transform: translateY(0px) scale(1); }
+            50% { transform: translateY(-10px) scale(1.04); }
+          }
+          @keyframes erqBtnEnter {
+            0% { opacity: 0; transform: translateY(12px) scale(0.95); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+          }
+          .animate-erq-float { animation: erqFloatSlow 5s ease-in-out infinite; }
+          .animate-erq-btn-enter { animation: erqBtnEnter 400ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+        `}</style>
+
+        <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-[#34B37B]/20 blur-3xl animate-erq-float pointer-events-none" />
+        <div className="absolute -bottom-24 -right-24 w-96 h-96 rounded-full bg-[#1E588D]/30 blur-3xl animate-erq-float pointer-events-none" />
+
+        {splashEstado !== 'OCULTO' && (
+          <div
+            className={`fixed inset-0 z-[70] flex flex-col items-center justify-center bg-gradient-to-br from-slate-950 via-[#0d243c] to-[#0b3330] text-white transition-all duration-500 ${
+              splashEstado === 'SALIENDO' ? 'opacity-0 scale-105 pointer-events-none' : 'opacity-100 scale-100'
+            }`}
+          >
+            <div className="relative z-10 flex flex-col items-center gap-5 px-6 max-w-md w-full text-center">
+              <div className="bg-white/95 px-7 py-5 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.45)] border border-white/30">
+                <ErquenciLogo subtitle="Plataforma Operativa ART • GPS en Vivo" />
+              </div>
+              <div className="w-full max-w-xs space-y-2 mt-1">
+                <div className="flex items-center justify-between text-[11px] font-bold tracking-wider uppercase text-emerald-200/90">
+                  <span className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full ${splashProgreso < 100 ? 'bg-amber-400 animate-ping' : 'bg-[#34B37B]'}`} />
+                    {splashProgreso < 50 ? 'Conectando con Supabase...' : splashProgreso < 100 ? 'Preparando portales ART...' : 'Sistema Operativo Listo'}
+                  </span>
+                  <span>{splashProgreso}%</span>
+                </div>
+                <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden border border-white/10">
+                  <div
+                    className="h-full bg-gradient-to-r from-[#34B37B] via-[#38bdf8] to-[#1E588D] rounded-full transition-all duration-300 ease-out"
+                    style={{ width: `${splashProgreso}%` }}
+                  />
+                </div>
+              </div>
+              {splashProgreso === 100 && (
+                <button
+                  type="button"
+                  onClick={ingresarDesdeSplash}
+                  className="animate-erq-btn-enter mt-2 group inline-flex items-center justify-center gap-2.5 px-7 py-3.5 rounded-2xl font-extrabold text-xs sm:text-sm tracking-wider uppercase text-white bg-gradient-to-r from-[#34B37B] via-[#268786] to-[#1E588D] shadow-[0_12px_35px_rgba(52,179,123,0.45)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 border border-white/25 cursor-pointer"
+                >
+                  <ShieldCheck className="w-5 h-5 text-emerald-100" />
+                  <span>INGRESAR A LA PLATAFORMA</span>
+                  <Navigation className="w-4 h-4 rotate-90 group-hover:translate-x-1 transition-transform" />
+                </button>
+              )}
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Contraseña</label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-[#1E588D] outline-none"
-              />
+          </div>
+        )}
+
+        <div className="relative z-10 w-full max-w-xl bg-white/95 backdrop-blur-xl rounded-3xl shadow-[0_25px_70px_rgba(0,0,0,0.45)] border border-white/40 p-6 sm:p-8 space-y-6 animate-erq-btn-enter">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
+            <ErquenciLogo subtitle="Acceso Multi-Portal • ART y Prestadores" />
+            <span className="px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-[#34B37B] animate-pulse" /> En Línea
+            </span>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+              1. Seleccioná tu Portal de Ingreso
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <button
+                type="button"
+                onClick={() => setLoginTipoPortal('CENTRAL_ART')}
+                className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                  loginTipoPortal === 'CENTRAL_ART'
+                    ? 'bg-[#1E588D] text-white border-[#1E588D] shadow-lg -translate-y-0.5'
+                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                <ShieldCheck className="w-5 h-5 mb-1.5" />
+                <div className="font-extrabold text-xs">Central ART</div>
+                <div className={`text-[10px] ${loginTipoPortal === 'CENTRAL_ART' ? 'text-blue-100' : 'text-slate-500'}`}>
+                  Aseguradora y Gestores ZIS
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setLoginTipoPortal('PRESTADOR')}
+                className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                  loginTipoPortal === 'PRESTADOR'
+                    ? 'bg-[#34B37B] text-white border-[#34B37B] shadow-lg -translate-y-0.5'
+                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                <Truck className="w-5 h-5 mb-1.5" />
+                <div className="font-extrabold text-xs">Portal Prestador</div>
+                <div className={`text-[10px] ${loginTipoPortal === 'PRESTADOR' ? 'text-emerald-100' : 'text-slate-500'}`}>
+                  Flota, Choferes y Viajes
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setLoginTipoPortal('SUPER_ADMIN')}
+                className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                  loginTipoPortal === 'SUPER_ADMIN'
+                    ? 'bg-slate-900 text-white border-slate-900 shadow-lg -translate-y-0.5'
+                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                <Lock className="w-5 h-5 mb-1.5" />
+                <div className="font-extrabold text-xs">Súper Admin</div>
+                <div className={`text-[10px] ${loginTipoPortal === 'SUPER_ADMIN' ? 'text-slate-300' : 'text-slate-500'}`}>
+                  Control Total Plataforma
+                </div>
+              </button>
             </div>
-            {authError && <p className="text-xs text-red-600 font-medium">{authError}</p>}
-            <button type="submit" className="w-full py-2.5 bg-[#1E588D] hover:bg-[#16436b] text-white font-semibold rounded-xl text-sm shadow">
-              Ingresar a la Plataforma
+          </div>
+
+          {loginTipoPortal === 'CENTRAL_ART' && (
+            <div className="bg-blue-50/70 border border-blue-200 rounded-2xl p-3">
+              <label className="block text-[10px] font-bold text-[#1E588D] uppercase mb-1">Aseguradora (ART)</label>
+              <select
+                value={loginArtSeleccionada}
+                onChange={(e) => setLoginArtSeleccionada(e.target.value)}
+                className="w-full border border-blue-200 bg-white rounded-xl px-3 py-2 text-xs font-bold text-slate-800"
+              >
+                {tarifasArt.map((t) => (
+                  <option key={t.nombre_art} value={t.nombre_art}>{t.nombre_art}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {loginTipoPortal === 'PRESTADOR' && (
+            <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-3">
+              <label className="block text-[10px] font-bold text-emerald-800 uppercase mb-1">Empresa Prestadora</label>
+              <select
+                value={loginPrestadorSeleccionado}
+                onChange={(e) => setLoginPrestadorSeleccionado(e.target.value)}
+                className="w-full border border-emerald-200 bg-white rounded-xl px-3 py-2 text-xs font-bold text-slate-800"
+              >
+                {prestadores.map((p) => (
+                  <option key={p.id} value={p.id}>{p.razon_social} (CUIT {p.cuit})</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Correo Corporativo</label>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder={loginTipoPortal === 'CENTRAL_ART' ? 'gestor@prevencionart.com.ar' : 'erquencisas@gmail.com'}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-[#1E588D] outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Contraseña</label>
+                <input
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-[#1E588D] outline-none"
+                />
+              </div>
+            </div>
+            {authError && <p className="text-xs text-rose-600 font-semibold">{authError}</p>}
+            <button
+              type="submit"
+              disabled={cargandoLogin}
+              className="w-full py-3 bg-gradient-to-r from-[#1E588D] to-[#268786] hover:opacity-95 text-white font-extrabold rounded-xl text-xs uppercase tracking-wider shadow-md transition cursor-pointer"
+            >
+              {cargandoLogin ? 'Verificando acceso...' : 'Iniciar Sesión Real'}
             </button>
           </form>
-          <div className="pt-4 border-t border-slate-100 text-center">
-            <button
-              onClick={() => setModoDemo(true)}
-              className="text-xs font-semibold text-[#34B37B] hover:underline"
-            >
-              Activar Modo Demo Comercial (Presentación ART)
-            </button>
+
+          <div className="pt-3 border-t border-slate-200 space-y-2">
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center">
+              Presentación Comercial (Ingreso Demo en 1 Clic)
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => entrarPortalDemo('CENTRAL_ART', loginArtSeleccionada)}
+                className="py-2 px-3 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#1E588D] font-bold text-[11px] border border-blue-200 transition cursor-pointer"
+              >
+                Demo Central {loginArtSeleccionada.replace(' ART', '')}
+              </button>
+              <button
+                type="button"
+                onClick={() => entrarPortalDemo('PRESTADOR', null, loginPrestadorSeleccionado)}
+                className="py-2 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-[11px] border border-emerald-200 transition cursor-pointer"
+              >
+                Demo Prestador
+              </button>
+              <button
+                type="button"
+                onClick={() => entrarPortalDemo('SUPER_ADMIN')}
+                className="py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-[11px] border border-slate-300 transition cursor-pointer"
+              >
+                Demo Súper Admin
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -3342,8 +3610,8 @@ export default function App() {
 
   const trasladosLiquidacion =
     filtroArtLiquidacion === 'TODAS'
-      ? traslados
-      : traslados.filter((t) => t.art_nombre === filtroArtLiquidacion);
+      ? trasladosVisiblesPortal
+      : trasladosVisiblesPortal.filter((t) => t.art_nombre === filtroArtLiquidacion);
   const totalFacturarFiltrado = +trasladosLiquidacion
     .reduce((acc, t) => acc + Number(t.importe_total || 0), 0)
     .toFixed(2);
@@ -3512,40 +3780,64 @@ export default function App() {
             }
           />
 
-          {modoDemo && !esAccesoExclusivoPaciente && !esAccesoExclusivoChofer && (
-            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
-              <button
-                onClick={() => cambiarRolConTransicion('CENTRAL_ART')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
-                  rolActivo === 'CENTRAL_ART' ? 'bg-[#1E588D] text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+          {!esAccesoExclusivoPaciente && !esAccesoExclusivoChofer && portalActivo && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold flex items-center gap-1.5 border ${
+                  portalActivo.rol === 'CENTRAL_ART'
+                    ? 'bg-blue-50 text-[#1E588D] border-blue-200'
+                    : portalActivo.rol === 'PRESTADOR'
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                    : 'bg-slate-900 text-white border-slate-800'
                 }`}
               >
-                <ShieldCheck className="w-3.5 h-3.5" /> Torre Control ART
-              </button>
-              <button
-                onClick={() => cambiarRolConTransicion('CHOFER')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
-                  rolActivo === 'CHOFER' ? 'bg-[#34B37B] text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Car className="w-3.5 h-3.5" /> App Chofer
-              </button>
-              <button
-                onClick={() => cambiarRolConTransicion('PACIENTE')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
-                  rolActivo === 'PACIENTE' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <UserCheck className="w-3.5 h-3.5" /> Vista Paciente
-              </button>
-            </div>
-          )}
+                {portalActivo.rol === 'CENTRAL_ART' ? <ShieldCheck className="w-3.5 h-3.5" /> : <Truck className="w-3.5 h-3.5" />}
+                {portalActivo.nombre}
+              </span>
 
-          {!esAccesoExclusivoPaciente && !esAccesoExclusivoChofer && (
-            <div className="flex items-center gap-3">
+              {(portalActivo.rol === 'CENTRAL_ART' || portalActivo.rol === 'SUPER_ADMIN') && (
+                <button
+                  type="button"
+                  onClick={() => copiarLinkPortal('CENTRAL_ART')}
+                  className="px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#1E588D] text-[11px] font-bold flex items-center gap-1 border border-blue-200"
+                  title="Copiar enlace directo para Gestores de la ART"
+                >
+                  <Share2 className="w-3.5 h-3.5" /> Link Gestores ART
+                </button>
+              )}
+
+              {(portalActivo.rol === 'PRESTADOR' || portalActivo.rol === 'SUPER_ADMIN') && (
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                  <button
+                    onClick={() => cambiarRolConTransicion('CENTRAL_ART')}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition ${
+                      rolActivo === 'CENTRAL_ART' ? 'bg-[#1E588D] text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" /> {portalActivo.rol === 'PRESTADOR' ? 'Mi Portal' : 'Torre Control'}
+                  </button>
+                  <button
+                    onClick={() => cambiarRolConTransicion('CHOFER')}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition ${
+                      rolActivo === 'CHOFER' ? 'bg-[#34B37B] text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Car className="w-3.5 h-3.5" /> Chofer
+                  </button>
+                  <button
+                    onClick={() => cambiarRolConTransicion('PACIENTE')}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition ${
+                      rolActivo === 'PACIENTE' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <UserCheck className="w-3.5 h-3.5" /> Paciente
+                  </button>
+                </div>
+              )}
+
               <button
                 onClick={cargarDatosDesdeSupabase}
-                className="text-xs font-medium text-slate-500 hover:text-[#1E588D] flex items-center gap-1"
+                className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-[#1E588D]"
                 title="Sincronizar datos con Supabase"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${sincronizandoDb ? 'animate-spin text-[#34B37B]' : ''}`} />
@@ -3553,11 +3845,12 @@ export default function App() {
               <button
                 onClick={() => {
                   supabase.auth.signOut();
+                  setPortalActivo(null);
                   setModoDemo(false);
                 }}
-                className="text-xs font-medium text-slate-500 hover:text-red-600 flex items-center gap-1"
+                className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold flex items-center gap-1 border border-rose-200"
               >
-                <Lock className="w-3.5 h-3.5" /> {session ? 'Cerrar Sesión' : 'Login Real'}
+                <Lock className="w-3.5 h-3.5" /> Salir
               </button>
             </div>
           )}
@@ -3625,56 +3918,62 @@ export default function App() {
             </div>
           )}
 
-          {/* SUB-NAVEGACIÓN */}
+          {/* SUB-NAVEGACIÓN DINÁMICA POR PORTAL */}
           <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
             <button
               onClick={() => cambiarTabAdmin('TORRE')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 ${
-                tabAdmin === 'TORRE' ? 'bg-[#1E588D] text-white' : 'bg-white text-slate-600 border border-slate-200'
+              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all duration-200 hover:-translate-y-0.5 ${
+                tabAdmin === 'TORRE' ? 'bg-[#1E588D] text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200'
               }`}
             >
-              <Activity className="w-4 h-4" /> Monitoreo y Radar ({traslados.length})
+              <Activity className="w-4 h-4" /> {portalActivo?.rol === 'PRESTADOR' ? 'Mi Hoja de Ruta' : 'Monitoreo y Radar'} ({trasladosVisiblesPortal.length})
             </button>
-            <button
-              onClick={() => setTabAdmin('NUEVO_VIAJE')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 ${
-                tabAdmin === 'NUEVO_VIAJE' ? 'bg-[#34B37B] text-white' : 'bg-white text-slate-600 border border-slate-200'
-              }`}
-            >
-              <Plus className="w-4 h-4" /> Derivar Nuevo Traslado
-            </button>
+            {(portalActivo?.rol === 'CENTRAL_ART' || portalActivo?.rol === 'SUPER_ADMIN') && (
+              <button
+                onClick={() => cambiarTabAdmin('NUEVO_VIAJE')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all duration-200 hover:-translate-y-0.5 ${
+                  tabAdmin === 'NUEVO_VIAJE' ? 'bg-[#34B37B] text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200'
+                }`}
+              >
+                <Plus className="w-4 h-4" /> Derivar Nuevo Traslado
+              </button>
+            )}
             <button
               onClick={() => cambiarTabAdmin('HISTORIAL')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 ${
-                tabAdmin === 'HISTORIAL' ? 'bg-[#1E588D] text-white' : 'bg-white text-slate-600 border border-slate-200'
+              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all duration-200 hover:-translate-y-0.5 ${
+                tabAdmin === 'HISTORIAL' ? 'bg-[#1E588D] text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200'
               }`}
             >
               <History className="w-4 h-4" /> Historial por Paciente ({historialPacientes.length})
             </button>
             <button
               onClick={() => cambiarTabAdmin('LIQUIDACION')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 ${
-                tabAdmin === 'LIQUIDACION' ? 'bg-[#1E588D] text-white' : 'bg-white text-slate-600 border border-slate-200'
+              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all duration-200 hover:-translate-y-0.5 ${
+                tabAdmin === 'LIQUIDACION' ? 'bg-[#1E588D] text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200'
               }`}
             >
-              <DollarSign className="w-4 h-4" /> Liquidación y Tarifas ART
+              <DollarSign className="w-4 h-4" /> {portalActivo?.rol === 'PRESTADOR' ? 'Mi Liquidación' : 'Liquidación y Tarifas ART'}
             </button>
-            <button
-              onClick={() => cambiarTabAdmin('FLOTA')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 ${
-                tabAdmin === 'FLOTA' ? 'bg-[#1E588D] text-white' : 'bg-white text-slate-600 border border-slate-200'
-              }`}
-            >
-              <Truck className="w-4 h-4" /> Flota, Choferes y Vencimientos ({vehiculos.length} autos • {choferes.length} choferes)
-            </button>
-            <button
-              onClick={() => cambiarTabAdmin('PRESTADORES')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 ${
-                tabAdmin === 'PRESTADORES' ? 'bg-[#1E588D] text-white' : 'bg-white text-slate-600 border border-slate-200'
-              }`}
-            >
-              <Building2 className="w-4 h-4" /> Prestadores y Base Operativa ({prestadores.length})
-            </button>
+            {(portalActivo?.rol === 'PRESTADOR' || portalActivo?.rol === 'SUPER_ADMIN') && (
+              <button
+                onClick={() => cambiarTabAdmin('FLOTA')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all duration-200 hover:-translate-y-0.5 ${
+                  tabAdmin === 'FLOTA' ? 'bg-[#1E588D] text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200'
+                }`}
+              >
+                <Truck className="w-4 h-4" /> Flota, Choferes y Vencimientos ({vehiculos.length} autos • {choferes.length} choferes)
+              </button>
+            )}
+            {(portalActivo?.rol === 'CENTRAL_ART' || portalActivo?.rol === 'SUPER_ADMIN') && (
+              <button
+                onClick={() => cambiarTabAdmin('PRESTADORES')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all duration-200 hover:-translate-y-0.5 ${
+                  tabAdmin === 'PRESTADORES' ? 'bg-[#1E588D] text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200'
+                }`}
+              >
+                <Building2 className="w-4 h-4" /> Prestadores Habilitados ({prestadores.length})
+              </button>
+            )}
           </div>
 
           <div key={tabAdmin} className="animate-erq-tab-enter space-y-6">
