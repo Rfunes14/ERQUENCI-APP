@@ -1571,10 +1571,16 @@ export default function App() {
     return () => clearTimeout(t);
   }, [barraCargaTab]);
 
+  const [tabSaliendo, setTabSaliendo] = useState(false);
+
   const cambiarTabAdmin = (nuevoTab) => {
-    if (nuevoTab === tabAdmin) return;
+    if (nuevoTab === tabAdmin || tabSaliendo) return;
     dispararBarraTransicion();
-    setTabAdmin(nuevoTab);
+    setTabSaliendo(true);
+    setTimeout(() => {
+      setTabAdmin(nuevoTab);
+      setTabSaliendo(false);
+    }, 180);
   };
 
   const cambiarRolConTransicion = (nuevoRol) => {
@@ -3740,6 +3746,9 @@ export default function App() {
           .animate-erq-float3d { animation: erqFloat3d 5.5s ease-in-out infinite; }
           .animate-erq-sphere { animation: erqSphereFloat 7s ease-in-out infinite; }
           .animate-erq-btn-enter { animation: erqBtnEnter 450ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+          @media (pointer: fine) {
+            *, *::before, *::after { cursor: none !important; }
+          }
         `}</style>
 
         <div
@@ -4095,9 +4104,19 @@ export default function App() {
         style={{ background: 'radial-gradient(circle at 35% 30%, #6ee7b7, #34B37B 65%, transparent 100%)' }}
       />
       <style>{`
+        @media (pointer: fine) {
+          *, *::before, *::after { cursor: none !important; }
+        }
+        @keyframes erqTabExit {
+          0% { opacity: 1; transform: perspective(900px) translateY(0) scale(1) rotateX(0deg); filter: blur(0px); }
+          100% { opacity: 0; transform: perspective(900px) translateY(-10px) scale(0.95) rotateX(6deg); filter: blur(5px); }
+        }
         @keyframes erqTabEnter {
-          0% { opacity: 0; transform: translateY(14px) scale(0.988); filter: blur(3px); }
-          100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0px); }
+          0% { opacity: 0; transform: perspective(900px) translateY(18px) scale(0.96) rotateX(-5deg); filter: blur(5px); }
+          100% { opacity: 1; transform: perspective(900px) translateY(0) scale(1) rotateX(0deg); filter: blur(0px); }
+        }
+        .animate-erq-tab-exit {
+          animation: erqTabExit 180ms cubic-bezier(0.4, 0, 1, 1) forwards;
         }
         @keyframes erqTopBar {
           0% { width: 0%; opacity: 1; }
@@ -4363,7 +4382,7 @@ export default function App() {
             )}
           </div>
 
-          <div key={tabAdmin} className="animate-erq-tab-enter space-y-6">
+          <div key={tabAdmin} className={`${tabSaliendo ? "animate-erq-tab-exit" : "animate-erq-tab-enter"} space-y-6`}>
           {/* PESTAÑA 1: MONITOREO + FILTROS + LINKS INDEPENDIENTES */}
           {tabAdmin === 'TORRE' && (
             <div className="space-y-5">
