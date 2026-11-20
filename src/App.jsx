@@ -10,6 +10,7 @@ import {
   Trash2, Edit3, Filter, Users, Accessibility, Scale,
   History, Repeat, Calendar, X, Check, Info, Copy, Compass
 } from 'lucide-react';
+
 // Formateador de moneda con soporte exacto para centavos ($5.630,04 / $11.260,08 / $656,85)
 const formatearMoneda = (valor) => {
   const num = Number(valor || 0);
@@ -19,6 +20,7 @@ const formatearMoneda = (valor) => {
     maximumFractionDigits: 2,
   });
 };
+
 // ============================================================================
 // LOGO CORPORATIVO ERQUENCI (LAZO INFINITO ESMERALDA A AZUL MÉDICO)
 // ============================================================================
@@ -56,6 +58,7 @@ const ErquenciLogo = ({ subtitle = "Torre de Control ART" }) => (
     </div>
   </div>
 );
+
 // ============================================================================
 // CATÁLOGOS DE CONDICIONES CLÍNICAS, VEHÍCULOS Y REGLAS DE LIQUIDACIÓN ART
 // ============================================================================
@@ -66,6 +69,7 @@ const CONDICIONES_PACIENTE_LABELS = {
   BARIATRICO_PESO_ESPECIAL: 'Bariátrico / Peso Especial (+120-150 kg)',
   POST_QUIRURGICO: 'Post-Quirúrgico / Férula o Yeso',
 };
+
 const ELEMENTOS_ORTOPEDICOS_LABELS = {
   NINGUNO: 'Ninguno',
   MULETAS_ANDADOR: 'Muletas / Andador / Bastón',
@@ -73,6 +77,7 @@ const ELEMENTOS_ORTOPEDICOS_LABELS = {
   SILLA_RUEDAS_RIGIDA: 'Silla de Ruedas Ortopédica / Rígida',
   FERULA_PIERNA_EXTENDIDA: 'Férula / Yeso (Pierna extendida atrás)',
 };
+
 const TIPOS_VEHICULO_ESPECIAL_LABELS = {
   ESTANDAR: 'Sedán Estándar',
   VEHICULO_AMPLIO_150KG: 'Vehículo Amplio / Reforzado (Paciente +120/150 kg)',
@@ -80,6 +85,7 @@ const TIPOS_VEHICULO_ESPECIAL_LABELS = {
   UTILITARIO_RAMPA_ACCESO_BAJO: 'Utilitario / SUV Acceso Cómodo',
   ASIENTO_TRASERO_LIBRE_FKT: 'Habitáculo Trasero Despejado (Inmovilización)',
 };
+
 const ESQUEMAS_LIQUIDACION_LABELS = {
   TRAMO_1_URBANO: 'Radio Céntrico — Tramo 1 Solo Ida ($5.630,04)',
   TRAMO_2_URBANO: 'Radio Céntrico — Ida y Vuelta Tramo 1 + 2 ($11.260,08)',
@@ -88,17 +94,20 @@ const ESQUEMAS_LIQUIDACION_LABELS = {
   KM_BASE_CIRCUITO_COMPLETO: 'Por KM (Cambia CP) — Base → Domicilio → Destino → Base (Circuito completo)',
   KM_IDA_VUELTA_PACIENTE: 'Por KM (Cambia CP) — Ida y Vuelta (Domicilio ↔ Destino × 2)',
 };
+
 const REGLAS_KM_ART_LABELS = {
   SOLO_IDA_PACIENTE: 'KM Solo de Ida (Domicilio → Destino)',
   BASE_DOMICILIO_DESTINO_VUELTA_SC: 'Base → Domicilio → Destino (Vuelta S/Cargo)',
   BASE_CIRCUITO_COMPLETO: 'Base → Domicilio → Destino → Base (Suma Ida y Vuelta a Base)',
   IDA_VUELTA_PACIENTE: 'Ida y Vuelta (Domicilio ↔ Destino × 2)',
 };
+
 const MODOS_FACTURACION_ART_LABELS = {
   URBANO_TRAMOS_Y_KM_CP: 'Mixto ART: Radio Céntrico por Tramo 1/2 Fijo • Fuera de CP suma KM',
   SOLO_TRAMOS_URBANOS: 'Siempre por Valor Fijo Urbano (Tramo 1 / Tramo 2)',
   SIEMPRE_POR_KM: 'Siempre por Kilómetros según regla pactada',
 };
+
 const TIPOS_DOC_VEHICULO = [
   { tipo: 'SEGURO', label: 'Seguro Automotor' },
   { tipo: 'HABILITACION_TRANSPORTE', label: 'Habilitación Transporte' },
@@ -106,6 +115,7 @@ const TIPOS_DOC_VEHICULO = [
   { tipo: 'MATAFUEGOS', label: 'Matafuegos' },
   { tipo: 'DESINFECCION', label: 'Cert. Desinfección' },
 ];
+
 // ============================================================================
 // HOJA DE RUTA REAL MAÑANA 19/11/2026 (PREVENCIÓN ART - 3 PACIENTES / 6 TRAMOS)
 // ============================================================================
@@ -342,6 +352,7 @@ const HOJA_RUTA_REAL_19_11_2026 = [
     chat_mensajes: [],
   },
 ];
+
 // Normaliza los 5 documentos obligatorios de cualquier vehículo
 const normalizarDocsVehiculo = (docs = []) => {
   const mapa = {};
@@ -353,6 +364,7 @@ const normalizarDocsVehiculo = (docs = []) => {
     vencimiento: mapa[item.tipo] || '2027-06-01',
   }));
 };
+
 // Extrae las condiciones y metadatos extendidos del traslado
 const obtenerMetaTraslado = (t) => {
   if (!t) {
@@ -382,6 +394,7 @@ const obtenerMetaTraslado = (t) => {
   const metaEvento = (t.eventos || []).find((ev) => ev && ev.meta_condiciones)?.meta_condiciones || {};
   const jsonCol = t.condiciones_traslado && typeof t.condiciones_traslado === 'object' ? t.condiciones_traslado : {};
   const combinado = { ...metaEvento, ...jsonCol };
+
   const peso = t.peso_paciente_kg ?? combinado.peso_paciente_kg ?? '';
   const llevaAcomp = Boolean(t.lleva_acompanante ?? combinado.lleva_acompanante ?? false);
   const llevaSilla = Boolean(t.lleva_silla_ruedas ?? combinado.lleva_silla_ruedas ?? false);
@@ -390,6 +403,7 @@ const obtenerMetaTraslado = (t) => {
       combinado.requiere_vehiculo_especial ??
       (Number(peso) >= 120)
   );
+
   const cpBase = String(t.cp_base ?? combinado.cp_base ?? '5600').trim();
   const cpOrigen = String(t.cp_origen ?? combinado.cp_origen ?? '5600').trim();
   const cpDestino = String(t.cp_destino ?? combinado.cp_destino ?? '5600').trim();
@@ -398,6 +412,7 @@ const obtenerMetaTraslado = (t) => {
       combinado.cambia_codigo_postal ??
       (cpOrigen !== cpBase || cpDestino !== cpBase)
   );
+
   return {
     condicion_paciente: t.condicion_paciente || combinado.condicion_paciente || 'AMBULATORIO',
     lleva_acompanante: llevaAcomp,
@@ -434,6 +449,7 @@ const obtenerMetaTraslado = (t) => {
     horas_espera_facturables: Number(t.horas_espera_facturables ?? combinado.horas_espera_facturables ?? 0),
   };
 };
+
 // Resumen legible en texto de las condiciones del traslado
 const resumirCondicionesTexto = (t) => {
   const c = obtenerMetaTraslado(t);
@@ -458,6 +474,7 @@ const resumirCondicionesTexto = (t) => {
   }
   return partes.length > 0 ? partes.join(' | ') : 'Ambulatorio estándar (sin requerimientos especiales)';
 };
+
 // ============================================================================
 // GEOCODIFICACIÓN GRATUITA EN SAN RAFAEL / MENDOZA (OPENSTREETMAP NOMINATIM)
 // ============================================================================
@@ -484,6 +501,7 @@ const buscarCoordenadasDireccion = async (direccion, localidadDefault = 'San Raf
   }
   return null;
 };
+
 const calcularDistanciaKm = (lat1, lng1, lat2, lng2) => {
   if (!lat1 || !lng1 || !lat2 || !lng2) return 4.2;
   const R = 6371;
@@ -498,6 +516,7 @@ const calcularDistanciaKm = (lat1, lng1, lat2, lng2) => {
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return Math.max(1.2, +(R * c * 1.25).toFixed(1));
 };
+
 // ============================================================================
 // BADGES VISUALES DE CONDICIONES DEL TRASLADO
 // ============================================================================
@@ -510,6 +529,7 @@ const BadgesCondicionesTraslado = ({ traslado, mostrarObservaciones = false }) =
     Number(c.peso_paciente_kg) > 0 ||
     (c.condicion_paciente && c.condicion_paciente !== 'AMBULATORIO') ||
     Boolean(c.observaciones_traslado);
+
   return (
     <div className="space-y-1.5">
       <div className="flex flex-wrap items-center gap-1.5">
@@ -564,6 +584,7 @@ const BadgesCondicionesTraslado = ({ traslado, mostrarObservaciones = false }) =
     </div>
   );
 };
+
 // ============================================================================
 // MAPA INTERACTIVO GPS INDIVIDUAL (VISTA PACIENTE Y DETALLE)
 // ============================================================================
@@ -580,6 +601,7 @@ const MapaSeguimientoGps = ({
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markerMovilRef = useRef(null);
+
   const origenCoords =
     origenCoordsProp?.lat && origenCoordsProp?.lng
       ? [origenCoordsProp.lat, origenCoordsProp.lng]
@@ -588,6 +610,7 @@ const MapaSeguimientoGps = ({
     destinoCoordsProp?.lat && destinoCoordsProp?.lng
       ? [destinoCoordsProp.lat, destinoCoordsProp.lng]
       : [-34.6152, -68.3342];
+
   const calcularPosicionActual = () => {
     if (coordsReales && coordsReales.lat && coordsReales.lng) {
       return [coordsReales.lat, coordsReales.lng];
@@ -597,8 +620,10 @@ const MapaSeguimientoGps = ({
     const lng = origenCoords[1] + (destinoCoords[1] - origenCoords[1]) * factor;
     return [lat, lng];
   };
+
   useEffect(() => {
     if (!mapContainerRef.current || !window.L) return;
+
     if (!mapInstanceRef.current) {
       const L = window.L;
       const posInicial = calcularPosicionActual();
@@ -607,15 +632,18 @@ const MapaSeguimientoGps = ({
         zoom: 13,
         zoomControl: true,
       });
+
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap',
       }).addTo(map);
+
       L.polyline([origenCoords, destinoCoords], {
         color: '#1E588D',
         weight: 4,
         opacity: 0.65,
         dashArray: '8, 8',
       }).addTo(map);
+
       const iconOrigen = L.divIcon({
         className: 'custom-pin',
         html: `<div style="background:#34B37B;color:white;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:12px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);">P</div>`,
@@ -625,6 +653,7 @@ const MapaSeguimientoGps = ({
       L.marker(origenCoords, { icon: iconOrigen })
         .addTo(map)
         .bindPopup(`<b>Retiro Paciente:</b><br/>${origenTexto}`);
+
       const iconDestino = L.divIcon({
         className: 'custom-pin',
         html: `<div style="background:#1E588D;color:white;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:14px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);">+</div>`,
@@ -634,6 +663,7 @@ const MapaSeguimientoGps = ({
       L.marker(destinoCoords, { icon: iconDestino })
         .addTo(map)
         .bindPopup(`<b>Centro Médico:</b><br/>${destinoTexto}`);
+
       const iconMovil = L.divIcon({
         className: 'custom-car',
         html: `<div style="background:#0f172a;color:#34B37B;padding:4px 8px;border-radius:999px;font-weight:800;font-size:11px;border:2px solid #34B37B;white-space:nowrap;box-shadow:0 4px 10px rgba(0,0,0,0.35);">🚕 ${patente || 'MÓVIL'}</div>`,
@@ -643,8 +673,10 @@ const MapaSeguimientoGps = ({
       markerMovilRef.current = L.marker(posInicial, { icon: iconMovil })
         .addTo(map)
         .bindPopup(`<b>Móvil ${patente}</b><br/>Chofer: ${choferNombre}`);
+
       mapInstanceRef.current = map;
     }
+
     return () => {
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
@@ -652,6 +684,7 @@ const MapaSeguimientoGps = ({
       }
     };
   }, [origenTexto, destinoTexto]);
+
   useEffect(() => {
     if (mapInstanceRef.current && markerMovilRef.current) {
       const nuevaPos = calcularPosicionActual();
@@ -659,6 +692,7 @@ const MapaSeguimientoGps = ({
       mapInstanceRef.current.panTo(nuevaPos, { animate: true });
     }
   }, [progreso, coordsReales]);
+
   return (
     <div className="relative w-full h-56 rounded-xl overflow-hidden border border-slate-200 z-10">
       <div ref={mapContainerRef} className="w-full h-full" />
@@ -671,6 +705,7 @@ const MapaSeguimientoGps = ({
     </div>
   );
 };
+
 // ============================================================================
 // MAPA GENERAL DE FLOTA EN VIVO (PARA TORRE DE CONTROL ART)
 // ============================================================================
@@ -678,6 +713,7 @@ const MapaGeneralFlota = ({ trasladosActivos, vehiculos, obtenerNombreChofer }) 
   const mapRef = useRef(null);
   const instanceRef = useRef(null);
   const markersRef = useRef({});
+
   // Inicializar el mapa una sola vez para no perder zoom ni parpadear con el GPS en vivo
   useEffect(() => {
     if (!mapRef.current || !window.L || instanceRef.current) return;
@@ -690,6 +726,7 @@ const MapaGeneralFlota = ({ trasladosActivos, vehiculos, obtenerNombreChofer }) 
       attribution: '&copy; OpenStreetMap',
     }).addTo(map);
     instanceRef.current = map;
+
     return () => {
       if (instanceRef.current) {
         instanceRef.current.remove();
@@ -698,12 +735,14 @@ const MapaGeneralFlota = ({ trasladosActivos, vehiculos, obtenerNombreChofer }) 
       }
     };
   }, []);
+
   // Actualizar posiciones y estados de cada unidad en tiempo real sin reconstruir el mapa
   useEffect(() => {
     if (!instanceRef.current || !window.L) return;
     const L = window.L;
     const map = instanceRef.current;
     const idsPresentes = new Set();
+
     trasladosActivos.forEach((t) => {
       const idStr = String(t.id);
       idsPresentes.add(idStr);
@@ -717,6 +756,7 @@ const MapaGeneralFlota = ({ trasladosActivos, vehiculos, obtenerNombreChofer }) 
       const pos = tieneGpsReal
         ? [t.coords_reales.lat, t.coords_reales.lng]
         : [orig[0] + (dest[0] - orig[0]) * factor, orig[1] + (dest[1] - orig[1]) * factor];
+
       const badgeExtra = cond.lleva_silla_ruedas ? ' ♿' : cond.requiere_vehiculo_especial ? ' ⭐' : '';
       const badgeGps = tieneGpsReal ? '📡 ' : '🚕 ';
       const bg = t.estado === 'ALERTA_DESPERFECTO' ? '#dc2626' : tieneGpsReal ? '#0f766e' : '#1E588D';
@@ -727,6 +767,7 @@ const MapaGeneralFlota = ({ trasladosActivos, vehiculos, obtenerNombreChofer }) 
         iconAnchor: [67, 12],
       });
       const popupHtml = `<b>${veh?.patente || 'Unidad'}</b> (${nombreChofer})<br/>${tieneGpsReal ? '<span style="color:#059669;font-weight:bold;">📡 GPS Real del Chofer</span>' : 'Ruta estimada'}<br/>Paciente: ${t.paciente_nombre}<br/>Hora: ${t.hora_programada} hs<br/>Estado: ${t.estado}<br/>Destino: ${t.destino_nombre}`;
+
       if (markersRef.current[idStr]) {
         markersRef.current[idStr].setLatLng(pos);
         markersRef.current[idStr].setIcon(icon);
@@ -735,6 +776,7 @@ const MapaGeneralFlota = ({ trasladosActivos, vehiculos, obtenerNombreChofer }) 
         markersRef.current[idStr] = L.marker(pos, { icon }).addTo(map).bindPopup(popupHtml);
       }
     });
+
     Object.keys(markersRef.current).forEach((idKey) => {
       if (!idsPresentes.has(idKey)) {
         map.removeLayer(markersRef.current[idKey]);
@@ -742,7 +784,9 @@ const MapaGeneralFlota = ({ trasladosActivos, vehiculos, obtenerNombreChofer }) 
       }
     });
   }, [trasladosActivos, vehiculos]);
+
   const cantidadGpsReal = trasladosActivos.filter((t) => t.coords_reales?.lat).length;
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
       <div className="px-4 py-2.5 bg-slate-900 text-white flex flex-wrap justify-between items-center gap-2 text-xs">
@@ -763,6 +807,7 @@ const MapaGeneralFlota = ({ trasladosActivos, vehiculos, obtenerNombreChofer }) 
     </div>
   );
 };
+
 // ============================================================================
 // COMPONENTE DE FIRMA DIGITAL TÁCTIL (CANVAS RESPONSIVE)
 // ============================================================================
@@ -770,6 +815,7 @@ const SignaturePad = ({ onSave, disabled }) => {
   const canvasRef = useRef(null);
   const [drawing, setDrawing] = useState(false);
   const [hasStrokes, setHasStrokes] = useState(false);
+
   const getCoords = (e) => {
     const rect = canvasRef.current.getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -779,6 +825,7 @@ const SignaturePad = ({ onSave, disabled }) => {
       y: (clientY - rect.top) * (canvasRef.current.height / rect.height),
     };
   };
+
   const startDraw = (e) => {
     if (disabled) return;
     setDrawing(true);
@@ -787,6 +834,7 @@ const SignaturePad = ({ onSave, disabled }) => {
     ctx.beginPath();
     ctx.moveTo(x, y);
   };
+
   const draw = (e) => {
     if (!drawing || disabled) return;
     e.preventDefault();
@@ -799,17 +847,21 @@ const SignaturePad = ({ onSave, disabled }) => {
     ctx.stroke();
     setHasStrokes(true);
   };
+
   const endDraw = () => setDrawing(false);
+
   const clearPad = () => {
     const ctx = canvasRef.current.getContext('2d');
     ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
     setHasStrokes(false);
   };
+
   const confirmSignature = () => {
     if (!hasStrokes) return;
     const dataUrl = canvasRef.current.toDataURL('image/png');
     onSave(dataUrl);
   };
+
   return (
     <div className="space-y-2">
       <div className="border-2 border-dashed border-slate-300 rounded-xl bg-white overflow-hidden touch-none">
@@ -847,6 +899,7 @@ const SignaturePad = ({ onSave, disabled }) => {
     </div>
   );
 };
+
 // ============================================================================
 // CÁLCULO DE SEMÁFORO DE VENCIMIENTOS LEGALES
 // ============================================================================
@@ -859,6 +912,7 @@ const evaluarVencimiento = (fechaStr) => {
   if (diffDias <= 30) return { estado: 'POR VENCER', dias: diffDias, badge: 'bg-amber-100 text-amber-800 border-amber-300', bloqueado: false };
   return { estado: 'VIGENTE', dias: diffDias, badge: 'bg-emerald-100 text-emerald-700 border-emerald-300', bloqueado: false };
 };
+
 // ============================================================================
 // BLOQUE REUTILIZABLE DE FORMULARIO DE CONDICIONES DEL TRASLADO
 // ============================================================================
@@ -874,6 +928,7 @@ const FormularioCondicionesTraslado = ({ state, onChange }) => {
       tipo_vehiculo_especial: autoEspecial ? 'VEHICULO_AMPLIO_150KG' : state.tipo_vehiculo_especial,
     });
   };
+
   const handleSillaChange = (checked) => {
     onChange({
       ...state,
@@ -886,6 +941,7 @@ const FormularioCondicionesTraslado = ({ state, onChange }) => {
         : 'NINGUNO',
     });
   };
+
   return (
     <div className="sm:col-span-2 p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2.5">
@@ -899,6 +955,7 @@ const FormularioCondicionesTraslado = ({ state, onChange }) => {
           </p>
         </div>
       </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-semibold text-slate-700 mb-1">Condición General del Paciente</label>
@@ -929,6 +986,7 @@ const FormularioCondicionesTraslado = ({ state, onChange }) => {
             ))}
           </select>
         </div>
+
         <div>
           <label className="block text-xs font-semibold text-slate-700 mb-1">
             Peso Estimado del Paciente (kg) <span className="text-slate-400 font-normal">(Opcional)</span>
@@ -949,6 +1007,7 @@ const FormularioCondicionesTraslado = ({ state, onChange }) => {
           )}
         </div>
       </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {/* Acompañante */}
         <div
@@ -977,6 +1036,7 @@ const FormularioCondicionesTraslado = ({ state, onChange }) => {
             />
           )}
         </div>
+
         {/* Silla de ruedas / Muletas */}
         <div
           className={`p-3 rounded-xl border transition ${
@@ -1010,6 +1070,7 @@ const FormularioCondicionesTraslado = ({ state, onChange }) => {
             </select>
           )}
         </div>
+
         {/* Vehículo Especial */}
         <div
           className={`p-3 rounded-xl border transition ${
@@ -1054,6 +1115,7 @@ const FormularioCondicionesTraslado = ({ state, onChange }) => {
           )}
         </div>
       </div>
+
       <div>
         <label className="block text-xs font-semibold text-slate-700 mb-1">
           Observaciones Clínicas / Indicaciones para el Chofer
@@ -1069,6 +1131,7 @@ const FormularioCondicionesTraslado = ({ state, onChange }) => {
     </div>
   );
 };
+
 // ============================================================================
 // APLICACIÓN PRINCIPAL ERQUENCI ART SAAS (CON PRUEBA REAL 19/11/2026)
 // ============================================================================
@@ -1078,8 +1141,10 @@ export default function App() {
   const choferIdUrl = params.get('chofer');
   const trasladoIdUrl = params.get('traslado');
   const modoUrl = params.get('modo');
+
   const esAccesoExclusivoPaciente = Boolean(pacienteTokenUrl || modoUrl === 'paciente');
   const esAccesoExclusivoChofer = Boolean(choferIdUrl || modoUrl === 'chofer');
+
   const [session, setSession] = useState(null);
   const [modoDemo, setModoDemo] = useState(true);
   const [rolActivo, setRolActivo] = useState(
@@ -1089,6 +1154,7 @@ export default function App() {
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
   const [sincronizandoDb, setSincronizandoDb] = useState(false);
+
   // ============================================================================
   // TARIFAS CONVENIDAS REALES (PREVENCIÓN ART: TRAMO 1 $5.630,04 | IDA Y VUELTA $11.260,08 | ESPERA $5.630,04 | KM SOLO IDA $656,85)
   // ============================================================================
@@ -1167,6 +1233,8 @@ export default function App() {
     modo_facturacion_default: 'URBANO_TRAMOS_Y_KM_CP',
     regla_km: 'SOLO_IDA_PACIENTE',
   });
+
+
   const [centrosMedicos, setCentrosMedicos] = useState([
     { id: 'cm-riv340', nombre: 'Fisiokinesio Terapia / Consultorios Rivadavia', direccion: 'Bernardino Rivadavia 340, San Rafael, Mendoza', codigo_postal: '5600', lat: -34.6152, lng: -68.3342 },
     { id: 'cm-1', nombre: 'Policlínica San Rafael', direccion: 'Av. Mitre 650, San Rafael', codigo_postal: '5600', lat: -34.6148, lng: -68.3265 },
@@ -1177,6 +1245,7 @@ export default function App() {
   const [mostrarGestorCentros, setMostrarGestorCentros] = useState(false);
   const [nuevoCentro, setNuevoCentro] = useState({ nombre: '', direccion: '', codigo_postal: '5600' });
   const [centroEditando, setCentroEditando] = useState(null);
+
   const [prestadores, setPrestadores] = useState([
     {
       id: '22222222-2222-2222-2222-222222222221',
@@ -1192,6 +1261,7 @@ export default function App() {
     },
   ]);
   const [prestadorEditando, setPrestadorEditando] = useState(null);
+
   const [choferes, setChoferes] = useState([
     {
       id: '44444444-4444-4444-4444-444444444441',
@@ -1214,6 +1284,7 @@ export default function App() {
     foto_url: '',
     licencia_venc: '2027-08-15',
   });
+
   const [vehiculos, setVehiculos] = useState([
     {
       id: '33333333-3333-3333-3333-333333333331',
@@ -1235,34 +1306,49 @@ export default function App() {
     },
   ]);
   const [vehiculoEditando, setVehiculoEditando] = useState(null);
+
   // 100% hidratado desde Supabase (sin re-inyectar viajes hardcodeados)
   const [traslados, setTraslados] = useState([]);
   const [viajeSeleccionadoId, setViajeSeleccionadoId] = useState(null);
   const [tabAdmin, setTabAdmin] = useState('TORRE');
   const [splashEstado, setSplashEstado] = useState('VISIBLE'); // 'VISIBLE' | 'SALIENDO' | 'OCULTO'
+  const [splashProgreso, setSplashProgreso] = useState(12);
   const [barraCargaTab, setBarraCargaTab] = useState(false);
+  const guardandoEstadoRef = useRef(false);
+
   useEffect(() => {
-    const t1 = setTimeout(() => setSplashEstado('SALIENDO'), 780);
-    const t2 = setTimeout(() => setSplashEstado('OCULTO'), 1200);
+    const t1 = setTimeout(() => setSplashProgreso(48), 220);
+    const t2 = setTimeout(() => setSplashProgreso(82), 520);
+    const t3 = setTimeout(() => setSplashProgreso(100), 880);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
+      clearTimeout(t3);
     };
   }, []);
+
+  const ingresarDesdeSplash = () => {
+    setSplashEstado('SALIENDO');
+    setTimeout(() => setSplashEstado('OCULTO'), 440);
+  };
+
   const dispararBarraTransicion = () => {
     setBarraCargaTab(false);
     requestAnimationFrame(() => setBarraCargaTab(true));
   };
+
   useEffect(() => {
     if (!barraCargaTab) return;
     const t = setTimeout(() => setBarraCargaTab(false), 450);
     return () => clearTimeout(t);
   }, [barraCargaTab]);
+
   const cambiarTabAdmin = (nuevoTab) => {
     if (nuevoTab === tabAdmin) return;
     dispararBarraTransicion();
     setTabAdmin(nuevoTab);
   };
+
   const cambiarRolConTransicion = (nuevoRol) => {
     if (nuevoRol === rolActivo) return;
     dispararBarraTransicion();
@@ -1283,6 +1369,7 @@ export default function App() {
   const bgWatcherIdRef = useRef(null);
   const [linkCopiadoMsg, setLinkCopiadoMsg] = useState('');
   const [guardandoHojaReal, setGuardandoHojaReal] = useState(false);
+
   // Filtros avanzados en Torre de Control
   const [busquedaTorre, setBusquedaTorre] = useState('');
   const [filtroArtTorre, setFiltroArtTorre] = useState('TODAS');
@@ -1291,12 +1378,15 @@ export default function App() {
   const [filtroCondicionTorre, setFiltroCondicionTorre] = useState('TODAS');
   const [busquedaHistorial, setBusquedaHistorial] = useState('');
   const [pacienteHistorialExpandido, setPacienteHistorialExpandido] = useState(null);
+
   // Modal de Edición de Traslado
   const [trasladoEditando, setTrasladoEditando] = useState(null);
+
   // Recurrencia en Nuevo Traslado (FKT / Rehabilitación)
   const [esRecurrente, setEsRecurrente] = useState(false);
   const [cantidadSesiones, setCantidadSesiones] = useState(5);
   const [frecuenciaSesiones, setFrecuenciaSesiones] = useState('DIARIO_HABIL');
+
   // Formulario de Nuevo Traslado
   const [nuevoViaje, setNuevoViaje] = useState({
     art_nombre: 'Prevención ART',
@@ -1330,6 +1420,7 @@ export default function App() {
     tipo_vehiculo_especial: 'ESTANDAR',
     observaciones_traslado: '',
   });
+
   const [nuevoPrestador, setNuevoPrestador] = useState({
     razon_social: '',
     cuit: '',
@@ -1340,6 +1431,7 @@ export default function App() {
     zona_cobertura: 'San Rafael, Mendoza',
     telefono_guardia: '',
   });
+
   const [nuevoVehiculo, setNuevoVehiculo] = useState({
     prestador_id: '22222222-2222-2222-2222-222222222221',
     chofer_id: '44444444-4444-4444-4444-444444444441',
@@ -1352,6 +1444,7 @@ export default function App() {
     matafuegos_venc: '2027-06-01',
     desinfeccion_venc: '2027-06-01',
   });
+
   // ============================================================================
   // RESOLUCIÓN DE CHOFER INDEPENDIENTE POR TRASLADO O VEHÍCULO
   // ============================================================================
@@ -1370,6 +1463,7 @@ export default function App() {
       telefono: '2604017356',
     };
   };
+
   const obtenerChoferDeTraslado = (t) => {
     if (!t) return null;
     const meta = obtenerMetaTraslado(t);
@@ -1384,6 +1478,7 @@ export default function App() {
     }
     return chVeh;
   };
+
   // ============================================================================
   // MOTOR DE LIQUIDACIÓN Y TARIFAS ART CON PRECISIÓN DECIMAL ($5.630,04 / $11.260,08 / $656,85)
   // ============================================================================
@@ -1400,22 +1495,27 @@ export default function App() {
       valor_tramo_2: Number(base?.valor_tramo_2 ?? 11260.08),
     };
   };
+
   const resolverEsquemaAutomatico = (artNombre, modalidadViaje, cpBase, cpOrigen, cpDestino) => {
     const tarifa = obtenerTarifaArt(artNombre);
     const cambiaCp =
       String(cpOrigen || '5600').trim() !== String(cpBase || '5600').trim() ||
       String(cpDestino || '5600').trim() !== String(cpBase || '5600').trim();
+
     if (tarifa.modo_facturacion_default === 'SOLO_TRAMOS_URBANOS') {
       return modalidadViaje === 'SOLO_IDA' ? 'TRAMO_1_URBANO' : 'TRAMO_2_URBANO';
     }
+
     if (tarifa.modo_facturacion_default === 'URBANO_TRAMOS_Y_KM_CP' && !cambiaCp) {
       return modalidadViaje === 'SOLO_IDA' ? 'TRAMO_1_URBANO' : 'TRAMO_2_URBANO';
     }
+
     if (tarifa.regla_km === 'BASE_CIRCUITO_COMPLETO') return 'KM_BASE_CIRCUITO_COMPLETO';
     if (tarifa.regla_km === 'IDA_VUELTA_PACIENTE') return 'KM_IDA_VUELTA_PACIENTE';
     if (tarifa.regla_km === 'BASE_DOMICILIO_DESTINO_VUELTA_SC') return 'KM_BASE_DOM_DEST_VUELTA_SC';
     return 'KM_SOLO_IDA_PACIENTE';
   };
+
   // Cálculo con precisión de 2 decimales exactos
   const calcularDesgloseLiquidacion = ({
     artNombre,
@@ -1434,9 +1534,11 @@ export default function App() {
     const franquicia = Number(tarifa.espera_desde_hora || 0);
     const horasEsperaFacturables = Math.max(0, +(esperaTotal - franquicia).toFixed(2));
     const importeEspera = +(horasEsperaFacturables * tarifa.valor_hora_espera).toFixed(2);
+
     let kmFacturables = 0;
     let importeRecorrido = 0;
     let descripcionCalculo = '';
+
     if (esquema === 'TRAMO_1_URBANO') {
       kmFacturables = o2d;
       importeRecorrido = +tarifa.valor_tramo_1.toFixed(2);
@@ -1464,6 +1566,7 @@ export default function App() {
       importeRecorrido = +(tarifa.bajada_bandera + kmFacturables * tarifa.valor_km).toFixed(2);
       descripcionCalculo = `KM Solo de Ida (${kmFacturables} km × $${formatearMoneda(tarifa.valor_km)})`;
     }
+
     const importeTotal = +(importeRecorrido + importeEspera).toFixed(2);
     return {
       kmFacturables,
@@ -1475,6 +1578,7 @@ export default function App() {
       descripcionCalculo,
     };
   };
+
   // ============================================================================
   // BOTÓN 1-CLIC PARA IMPACTAR LOS 3 TRASLADOS REALES DEL 19/11/2026 EN SUPABASE
   // ============================================================================
@@ -1490,16 +1594,20 @@ export default function App() {
           bajada_bandera: 0,
         })
         .eq('nombre_art', 'Prevención ART');
+
       // 2. Verificar cuáles de los 3 pacientes del 19/11/2026 aún no están en Supabase
       const { data: existentes } = await supabase
         .from('traslados')
         .select('id, paciente_dni, fecha_programada')
         .eq('fecha_programada', '2026-11-19');
+
       const dnisExistentes = new Set((existentes || []).map((x) => String(x.paciente_dni).trim()));
       const pendientes = HOJA_RUTA_REAL_19_11_2026.filter((item) => !dnisExistentes.has(item.paciente_dni));
+
       if (pendientes.length > 0) {
         const vehIdReal = vehiculos[0]?.id || '33333333-3333-3333-3333-333333333331';
         const prestIdReal = prestadores[0]?.id || '22222222-2222-2222-2222-222222222221';
+
         const payloadsBase = pendientes.map((item) => ({
           art_nombre: item.art_nombre,
           modalidad_viaje: item.modalidad_viaje,
@@ -1525,6 +1633,7 @@ export default function App() {
           eventos: item.eventos,
           chat_mensajes: [],
         }));
+
         const { data: insertados, error } = await supabase.from('traslados').insert(payloadsBase).select();
         if (error) {
           alert('Aviso al sincronizar con Supabase: ' + error.message);
@@ -1538,6 +1647,7 @@ export default function App() {
           }
         }
       }
+
       await cargarDatosDesdeSupabase();
       alert('¡Los 3 traslados reales del 19/11/2026 y las tarifas de Prevención ART quedaron sincronizados en Supabase!');
     } catch (e) {
@@ -1546,6 +1656,7 @@ export default function App() {
       setGuardandoHojaReal(false);
     }
   };
+
   // ============================================================================
   // SINCRONIZACIÓN CON SUPABASE + RESPALDO LOCAL
   // ============================================================================
@@ -1561,6 +1672,7 @@ export default function App() {
           console.warn(e);
         }
       }
+
       const [resPrest, resVeh, resCentros, resTarifas, resTraslados, resChoferes] = await Promise.all([
         supabase.from('prestadores').select('*').order('created_at', { ascending: true }),
         supabase.from('vehiculos').select('*').order('created_at', { ascending: true }),
@@ -1569,6 +1681,7 @@ export default function App() {
         supabase.from('traslados').select('*').order('created_at', { ascending: false }),
         supabase.from('choferes').select('*').order('created_at', { ascending: true }),
       ]);
+
       if (resPrest.data && resPrest.data.length > 0) {
         const prestNorm = resPrest.data.map((p) => ({
           domicilio_base: 'Av. Moreno 37, San Rafael, Mendoza',
@@ -1579,10 +1692,12 @@ export default function App() {
         }));
         setPrestadores(prestNorm);
       }
+
       if (resChoferes && !resChoferes.error && Array.isArray(resChoferes.data) && resChoferes.data.length > 0) {
         setChoferes(resChoferes.data);
         localStorage.setItem('erquenci_choferes_v3', JSON.stringify(resChoferes.data));
       }
+
       if (resVeh.data && resVeh.data.length > 0) {
         const vehNorm = resVeh.data.map((v) => ({
           ...v,
@@ -1612,6 +1727,7 @@ export default function App() {
           chofer_id: vehNorm[0].chofer_id || prev.chofer_id,
         }));
       }
+
       if (resCentros.data && resCentros.data.length > 0) {
         const tieneRivadavia = resCentros.data.some((c) => (c.direccion || '').includes('340') || (c.nombre || '').includes('Rivadavia'));
         const listaCentros = resCentros.data.map((cm) => ({
@@ -1630,6 +1746,7 @@ export default function App() {
         }
         setCentrosMedicos(listaCentros);
       }
+
       if (resTarifas.data && resTarifas.data.length > 0) {
         setTarifasArt(
           resTarifas.data.map((t) => {
@@ -1656,9 +1773,11 @@ export default function App() {
           })
         );
       }
+
       if (resTraslados.data) {
         const lista = resTraslados.data;
         setTraslados(lista);
+
         if (pacienteTokenUrl) {
           const encontrado = lista.find((t) => t.token_paciente === pacienteTokenUrl);
           if (encontrado) setViajeSeleccionadoId(encontrado.id);
@@ -1678,6 +1797,7 @@ export default function App() {
       setSincronizandoDb(false);
     }
   };
+
   // Fusión silenciosa de cambios de traslados (sin parpadeo ni spinner)
   const aplicarCambioTrasladoEnEstado = (registro) => {
     if (!registro || !registro.id) return;
@@ -1690,6 +1810,7 @@ export default function App() {
     });
     setUltimaSyncVivo(new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
   };
+
   // Emitir evento instantáneo por Supabase Broadcast (<100ms entre Central, Chofer y Paciente)
   const emitirCambioEnVivo = (id, patch) => {
     if (liveChannelRef.current) {
@@ -1700,10 +1821,13 @@ export default function App() {
       });
     }
   };
+
   // Sincronización silenciosa de respaldo cada 3.5 segundos (ideal si falla el WebSocket en 4G)
   const sincronizarTrasladosSilencioso = async () => {
+    if (guardandoEstadoRef.current) return;
     try {
       const { data } = await supabase.from('traslados').select('*').order('created_at', { ascending: false });
+      if (guardandoEstadoRef.current) return;
       if (data) {
         setTraslados(data);
         setUltimaSyncVivo(new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
@@ -1712,8 +1836,10 @@ export default function App() {
       console.warn('Sync silencioso:', e);
     }
   };
+
   useEffect(() => {
     cargarDatosDesdeSupabase();
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         setSession(session);
@@ -1724,6 +1850,7 @@ export default function App() {
       setSession(session);
       if (session) setModoDemo(false);
     });
+
     // Canal 1: Postgres Changes (BD -> todos los clientes)
     const dbChannel = supabase
       .channel('traslados-realtime')
@@ -1737,6 +1864,7 @@ export default function App() {
         }
       })
       .subscribe();
+
     // Canal 2: Broadcast instantáneo (GPS en vivo, chat, firma y estados sin esperar refresh)
     const liveChannel = supabase
       .channel('erquenci-live-sync', { config: { broadcast: { self: false } } })
@@ -1745,10 +1873,12 @@ export default function App() {
       })
       .subscribe();
     liveChannelRef.current = liveChannel;
+
     // Respaldo automático cada 3.5s
     const pollInterval = setInterval(() => {
       sincronizarTrasladosSilencioso();
     }, 3500);
+
     return () => {
       subscription.unsubscribe();
       supabase.removeChannel(dbChannel);
@@ -1759,6 +1889,7 @@ export default function App() {
       }
     };
   }, []);
+
   // Simulación suave de avance GPS si el viaje está activo y no hay GPS físico encendido
   useEffect(() => {
     if (gpsRealActivo) return;
@@ -1777,6 +1908,7 @@ export default function App() {
     }, 4000);
     return () => clearInterval(interval);
   }, [gpsRealActivo]);
+
   const copiarEnlacePortapapeles = (url, etiqueta) => {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(url);
@@ -1784,25 +1916,30 @@ export default function App() {
     setLinkCopiadoMsg(`✓ Link de ${etiqueta} copiado: ${url}`);
     setTimeout(() => setLinkCopiadoMsg(''), 4500);
   };
+
   const procesarNuevaCoordenadaGps = async (lat, lng) => {
     const idActual = viajeActivoIdRef.current;
     if (!idActual) return;
     const ahoraMs = Date.now();
     if (ahoraMs - ultimoEnvioGpsRef.current < 2500) return;
     ultimoEnvioGpsRef.current = ahoraMs;
+
     const coords = {
       lat: +Number(lat).toFixed(6),
       lng: +Number(lng).toFixed(6),
       ts: ahoraMs,
     };
+
     setTraslados((prev) =>
       prev.map((t) => (t.id === idActual ? { ...t, coords_reales: coords } : t))
     );
     emitirCambioEnVivo(idActual, { coords_reales: coords });
+
     if (!String(idActual).startsWith('real-')) {
       await supabase.from('traslados').update({ coords_reales: coords }).eq('id', idActual);
     }
   };
+
   const detenerGpsRealDispositivo = async () => {
     const BgGeo = window.Capacitor?.Plugins?.BackgroundGeolocation;
     if (bgWatcherIdRef.current && BgGeo) {
@@ -1823,6 +1960,7 @@ export default function App() {
     }
     setGpsRealActivo(false);
   };
+
   const activarGpsRealDispositivo = async (silencioso = false) => {
     // 1. Si corre dentro del APK Android (Capacitor), usar GPS nativo en segundo plano (funciona con pantalla bloqueada)
     const BgGeo = window.Capacitor?.Plugins?.BackgroundGeolocation;
@@ -1860,6 +1998,7 @@ export default function App() {
         console.warn('Fallback a GPS web:', e);
       }
     }
+
     // 2. Modo Navegador Web: Geolocation + Wake Lock (mantiene pantalla encendida)
     if (!navigator.geolocation) {
       if (!silencioso) alert('Tu navegador no soporta geolocalización GPS.');
@@ -1887,6 +2026,7 @@ export default function App() {
       { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
     );
   };
+
   const leerArchivoBase64 = (file, cb) => {
     if (!file) return;
     const reader = new FileReader();
@@ -1912,6 +2052,7 @@ export default function App() {
     };
     reader.readAsDataURL(file);
   };
+
   const ubicarDomicilioEnMapa = async () => {
     if (!nuevoViaje.origen_direccion.trim()) return;
     setBuscandoGeo(true);
@@ -1933,6 +2074,7 @@ export default function App() {
       alert('No se encontró la altura exacta, se usará la coordenada urbana base.');
     }
   };
+
   // ============================================================================
   // ABM COMPLETO DE CENTROS MÉDICOS (AGREGAR, MODIFICAR Y ELIMINAR)
   // ============================================================================
@@ -1941,6 +2083,7 @@ export default function App() {
     setBuscandoGeo(true);
     const coords = nuevoCentro.direccion ? await buscarCoordenadasDireccion(nuevoCentro.direccion) : null;
     setBuscandoGeo(false);
+
     const payloadBase = {
       nombre: nuevoCentro.nombre.trim(),
       direccion: nuevoCentro.direccion.trim(),
@@ -1951,6 +2094,7 @@ export default function App() {
       ...payloadBase,
       codigo_postal: nuevoCentro.codigo_postal || coords?.cp || '5600',
     };
+
     let { data, error } = await supabase.from('centros_medicos').insert([payloadExt]).select().single();
     if (error) {
       const retry = await supabase.from('centros_medicos').insert([payloadBase]).select().single();
@@ -1962,6 +2106,7 @@ export default function App() {
       ...(data || {}),
       codigo_postal: payloadExt.codigo_postal,
     };
+
     setCentrosMedicos([...centrosMedicos, registro]);
     const label = registro.direccion ? `${registro.nombre} (${registro.direccion})` : registro.nombre;
     setNuevoViaje({
@@ -1974,11 +2119,13 @@ export default function App() {
     setNuevoCentro({ nombre: '', direccion: '', codigo_postal: '5600' });
     setMostrarFormCentro(false);
   };
+
   const guardarEdicionCentroMedico = async () => {
     if (!centroEditando || !centroEditando.nombre.trim()) return;
     setBuscandoGeo(true);
     const coords = centroEditando.direccion ? await buscarCoordenadasDireccion(centroEditando.direccion) : null;
     setBuscandoGeo(false);
+
     const patchBase = {
       nombre: centroEditando.nombre.trim(),
       direccion: (centroEditando.direccion || '').trim(),
@@ -1989,32 +2136,38 @@ export default function App() {
       ...patchBase,
       codigo_postal: centroEditando.codigo_postal || '5600',
     };
+
     let { error } = await supabase.from('centros_medicos').update(patchExt).eq('id', centroEditando.id);
     if (error) {
       await supabase.from('centros_medicos').update(patchBase).eq('id', centroEditando.id);
     }
+
     setCentrosMedicos((prev) =>
       prev.map((cm) => (cm.id === centroEditando.id ? { ...cm, ...patchExt } : cm))
     );
     setCentroEditando(null);
   };
+
   const eliminarCentroMedico = async (cm) => {
     if (!window.confirm(`¿Confirmás eliminar el centro médico "${cm.nombre}"?`)) return;
     await supabase.from('centros_medicos').delete().eq('id', cm.id);
     setCentrosMedicos((prev) => prev.filter((item) => item.id !== cm.id));
   };
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setAuthError('');
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) setAuthError('Credenciales inválidas o usuario no registrado en Supabase Auth.');
   };
+
   const vehiculoEstaBloqueado = (v) => {
     const ch = obtenerChoferDeVehiculo(v);
     const licVencida = evaluarVencimiento(ch?.licencia_venc || v.licencia_venc).bloqueado;
     const docVencido = normalizarDocsVehiculo(v.docs).some((d) => evaluarVencimiento(d.vencimiento).bloqueado);
     return licVencida || docVencido;
   };
+
   // Filtrado de traslados en Torre de Control
   const trasladosFiltradosTorre = traslados.filter((t) => {
     const cond = obtenerMetaTraslado(t);
@@ -2052,8 +2205,10 @@ export default function App() {
       Number(cond.peso_paciente_kg || 0) < 120
     )
       return false;
+
     return true;
   });
+
   const trasladosDelChoferActivo = choferIdUrl
     ? traslados.filter((t) => {
         const meta = obtenerMetaTraslado(t);
@@ -2061,6 +2216,7 @@ export default function App() {
         return meta.chofer_id === choferIdUrl || veh?.chofer_id === choferIdUrl;
       })
     : traslados;
+
   const viajeActivo =
     (pacienteTokenUrl ? traslados.find((t) => t.token_paciente === pacienteTokenUrl) : null) ||
     (trasladoIdUrl ? traslados.find((t) => String(t.id) === String(trasladoIdUrl)) : null) ||
@@ -2068,10 +2224,12 @@ export default function App() {
     (rolActivo === 'CHOFER' ? trasladosDelChoferActivo[0] : null) ||
     trasladosFiltradosTorre[0] ||
     traslados[0];
+
   viajeActivoIdRef.current = viajeActivo?.id || null;
   const vehiculoAsignado = vehiculos.find((v) => v.id === viajeActivo?.vehiculo_id) || vehiculos[0];
   const choferAsignadoViaje = obtenerChoferDeTraslado(viajeActivo);
   const prestadorAsignado = prestadores.find((p) => p.id === viajeActivo?.prestador_id) || prestadores[0];
+
   const cambiarEstadoViaje = async (id, nuevoEstado, extra = {}) => {
     const actual = traslados.find((t) => t.id === id);
     if (!actual) return;
@@ -2080,13 +2238,16 @@ export default function App() {
       ...(actual.eventos || []),
       { hora: ahora, estado: nuevoEstado, detalle: `Actualizado a ${nuevoEstado.replace(/_/g, ' ')}` },
     ];
+
     const actualizacion = {
       estado: nuevoEstado,
       eventos: nuevosEventos,
       ...extra,
     };
+
     setTraslados((prev) => prev.map((t) => (t.id === id ? { ...t, ...actualizacion } : t)));
     emitirCambioEnVivo(id, actualizacion);
+
     if (
       rolActivo === 'CHOFER' &&
       ['EN_CAMINO_DOMICILIO', 'EN_DOMICILIO', 'PACIENTE_A_BORDO'].includes(nuevoEstado) &&
@@ -2094,20 +2255,43 @@ export default function App() {
     ) {
       activarGpsRealDispositivo(true);
     }
+
     if (!String(id).startsWith('real-')) {
-      await supabase.from('traslados').update(actualizacion).eq('id', id);
+      guardandoEstadoRef.current = true;
+      try {
+        let { error } = await supabase.from('traslados').update(actualizacion).eq('id', id);
+        if (error && nuevoEstado === 'REALIZADO') {
+          console.warn('Reintentando cierre con estado FINALIZADO por constraint:', error.message);
+          const fallbackActualizacion = { ...actualizacion, estado: 'FINALIZADO' };
+          const resFallback = await supabase.from('traslados').update(fallbackActualizacion).eq('id', id);
+          error = resFallback.error;
+          if (!error) {
+            setTraslados((prev) => prev.map((t) => (t.id === id ? { ...t, ...fallbackActualizacion } : t)));
+            emitirCambioEnVivo(id, fallbackActualizacion);
+          }
+        }
+        if (error) {
+          console.error('Error guardando estado en Supabase:', error);
+          alert(`No se pudo guardar el estado en la base de datos: ${error.message}`);
+        }
+      } finally {
+        guardandoEstadoRef.current = false;
+      }
     }
   };
+
   // Recalcular liquidación en vivo con centavos exactos
   const actualizarLiquidacionViaje = async (id, cambios = {}) => {
     const actual = traslados.find((t) => t.id === id);
     if (!actual) return;
     const meta = obtenerMetaTraslado(actual);
+
     const esquemaNuevo = cambios.esquema_liquidacion ?? meta.esquema_liquidacion;
     const kmBaseOrig = Number(cambios.km_base_a_origen ?? meta.km_base_a_origen ?? 2.0);
     const kmOrigDest = Number(cambios.km_origen_a_destino ?? cambios.km_reales ?? actual.km_reales ?? 4.5);
     const kmDestBase = Number(cambios.km_destino_a_base ?? meta.km_destino_a_base ?? 3.5);
     const esperaTotal = Number(cambios.horas_espera ?? actual.horas_espera ?? 0);
+
     const desglose = calcularDesgloseLiquidacion({
       artNombre: actual.art_nombre,
       esquema: esquemaNuevo,
@@ -2117,6 +2301,7 @@ export default function App() {
       kmDestinoABase: kmDestBase,
       horasEsperaTotal: esperaTotal,
     });
+
     const nuevoMeta = {
       ...meta,
       esquema_liquidacion: esquemaNuevo,
@@ -2125,10 +2310,12 @@ export default function App() {
       km_destino_a_base: kmDestBase,
       horas_espera_facturables: desglose.horasEsperaFacturables,
     };
+
     const eventosActualizados = Array.isArray(actual.eventos) ? [...actual.eventos] : [];
     if (eventosActualizados.length > 0) {
       eventosActualizados[0] = { ...eventosActualizados[0], meta_condiciones: nuevoMeta };
     }
+
     const basePatch = {
       km_reales: kmOrigDest,
       horas_espera: esperaTotal,
@@ -2144,6 +2331,7 @@ export default function App() {
       horas_espera_facturables: desglose.horasEsperaFacturables,
       condiciones_traslado: nuevoMeta,
     };
+
     setTraslados((prev) => prev.map((t) => (t.id === id ? { ...t, ...extPatch } : t)));
     if (!String(id).startsWith('real-')) {
       let { error } = await supabase.from('traslados').update(extPatch).eq('id', id);
@@ -2152,12 +2340,14 @@ export default function App() {
       }
     }
   };
+
   const eliminarTraslado = async (t, e) => {
     if (e) e.stopPropagation();
     const ok = window.confirm(
       `¿Confirmás eliminar el traslado de ${t.paciente_nombre} (Siniestro ${t.numero_siniestro} - ${t.fecha_programada})?`
     );
     if (!ok) return;
+
     if (!String(t.id).startsWith('real-')) {
       await supabase.from('traslados').delete().eq('id', t.id);
     }
@@ -2167,6 +2357,7 @@ export default function App() {
       setViajeSeleccionadoId(restantes[0]?.id || null);
     }
   };
+
   const abrirModalEdicion = (t, e) => {
     if (e) e.stopPropagation();
     const meta = obtenerMetaTraslado(t);
@@ -2175,13 +2366,16 @@ export default function App() {
       ...meta,
     });
   };
+
   const guardarEdicionTraslado = async (e) => {
     e.preventDefault();
     if (!trasladoEditando) return;
+
     const ch = choferes.find((c) => c.id === trasladoEditando.chofer_id);
     const cambiaCp =
       String(trasladoEditando.cp_origen || '5600').trim() !== String(trasladoEditando.cp_base || '5600').trim() ||
       String(trasladoEditando.cp_destino || '5600').trim() !== String(trasladoEditando.cp_base || '5600').trim();
+
     const desglose = calcularDesgloseLiquidacion({
       artNombre: trasladoEditando.art_nombre,
       esquema: trasladoEditando.esquema_liquidacion || 'TRAMO_2_URBANO',
@@ -2191,6 +2385,7 @@ export default function App() {
       kmDestinoABase: trasladoEditando.km_destino_a_base || 3.5,
       horasEsperaTotal: trasladoEditando.horas_espera || 0,
     });
+
     const condicionesObj = {
       condicion_paciente: trasladoEditando.condicion_paciente || 'AMBULATORIO',
       lleva_acompanante: Boolean(trasladoEditando.lleva_acompanante),
@@ -2213,6 +2408,7 @@ export default function App() {
       km_destino_a_base: Number(trasladoEditando.km_destino_a_base || 3.5),
       horas_espera_facturables: desglose.horasEsperaFacturables,
     };
+
     const eventosPrevios = Array.isArray(trasladoEditando.eventos) ? [...trasladoEditando.eventos] : [];
     if (eventosPrevios.length > 0) {
       eventosPrevios[0] = { ...eventosPrevios[0], meta_condiciones: condicionesObj };
@@ -2224,6 +2420,7 @@ export default function App() {
         meta_condiciones: condicionesObj,
       });
     }
+
     const basePatch = {
       art_nombre: trasladoEditando.art_nombre,
       modalidad_viaje: trasladoEditando.modalidad_viaje,
@@ -2243,22 +2440,26 @@ export default function App() {
       importe_total: desglose.importeTotal,
       eventos: eventosPrevios,
     };
+
     const fullPatch = {
       ...basePatch,
       ...condicionesObj,
       condiciones_traslado: condicionesObj,
     };
+
     if (!String(trasladoEditando.id).startsWith('real-')) {
       let { error } = await supabase.from('traslados').update(fullPatch).eq('id', trasladoEditando.id);
       if (error) {
         await supabase.from('traslados').update(basePatch).eq('id', trasladoEditando.id);
       }
     }
+
     setTraslados((prev) =>
       prev.map((item) => (item.id === trasladoEditando.id ? { ...item, ...fullPatch } : item))
     );
     setTrasladoEditando(null);
   };
+
   const repetirTrasladoPaciente = (t, e) => {
     if (e) e.stopPropagation();
     const cond = obtenerMetaTraslado(t);
@@ -2288,12 +2489,14 @@ export default function App() {
     });
     setTabAdmin('NUEVO_VIAJE');
   };
+
   const enviarReporteDesperfecto = () => {
     if (!textoFalla.trim() || !viajeActivo) return;
     cambiarEstadoViaje(viajeActivo.id, 'ALERTA_DESPERFECTO', { falla_reportada: textoFalla });
     setModalDesperfecto(false);
     setTextoFalla('');
   };
+
   const reasignarMovilAuxilio = (trasladoId, nuevoVehiculoId) => {
     const veh = vehiculos.find((v) => v.id === nuevoVehiculoId);
     if (!veh || vehiculoEstaBloqueado(veh)) return;
@@ -2303,6 +2506,7 @@ export default function App() {
       falla_reportada: null,
     });
   };
+
   const generarFechasRecurrentes = (fechaInicioStr, totalSesiones, patron) => {
     if (!esRecurrente || totalSesiones <= 1) return [fechaInicioStr];
     const fechas = [];
@@ -2325,11 +2529,13 @@ export default function App() {
     }
     return fechas;
   };
+
   const crearNuevoTraslado = async (e) => {
     e.preventDefault();
     const veh = vehiculos.find((v) => v.id === nuevoViaje.vehiculo_id);
     const ch = choferes.find((c) => c.id === nuevoViaje.chofer_id) || obtenerChoferDeVehiculo(veh);
     const prest = prestadores.find((p) => p.id === nuevoViaje.prestador_id) || prestadores[0];
+
     if (veh && vehiculoEstaBloqueado(veh)) {
       alert('No se puede asignar un móvil con documentación vencida.');
       return;
@@ -2338,12 +2544,14 @@ export default function App() {
       alert(`No se puede asignar al chofer ${ch.nombre} porque su licencia está vencida (${ch.licencia_venc}).`);
       return;
     }
+
     const baseLat = prest?.base_lat || -34.6158;
     const baseLng = prest?.base_lng || -68.3285;
     const cpBase = String(prest?.codigo_postal_base || '5600').trim();
     const cpOrigen = String(nuevoViaje.cp_origen || '5600').trim();
     const cpDestino = String(nuevoViaje.cp_destino || '5600').trim();
     const cambiaCp = cpOrigen !== cpBase || cpDestino !== cpBase;
+
     const kmBaseAOrigen = calcularDistanciaKm(baseLat, baseLng, nuevoViaje.origen_lat, nuevoViaje.origen_lng);
     const kmOrigenADestino = calcularDistanciaKm(
       nuevoViaje.origen_lat,
@@ -2352,6 +2560,7 @@ export default function App() {
       nuevoViaje.destino_lng
     );
     const kmDestinoABase = calcularDistanciaKm(nuevoViaje.destino_lat, nuevoViaje.destino_lng, baseLat, baseLng);
+
     const esquemaEfectivo =
       nuevoViaje.esquema_liquidacion === 'AUTO'
         ? resolverEsquemaAutomatico(
@@ -2362,6 +2571,7 @@ export default function App() {
             cpDestino
           )
         : nuevoViaje.esquema_liquidacion;
+
     const desglose = calcularDesgloseLiquidacion({
       artNombre: nuevoViaje.art_nombre,
       esquema: esquemaEfectivo,
@@ -2371,6 +2581,7 @@ export default function App() {
       kmDestinoABase,
       horasEsperaTotal: 0,
     });
+
     const condicionesObj = {
       condicion_paciente: nuevoViaje.condicion_paciente || 'AMBULATORIO',
       lleva_acompanante: Boolean(nuevoViaje.lleva_acompanante),
@@ -2393,11 +2604,13 @@ export default function App() {
       km_destino_a_base: kmDestinoABase,
       horas_espera_facturables: 0,
     };
+
     const fechasProgramadas = generarFechasRecurrentes(
       nuevoViaje.fecha_programada || '2026-11-19',
       Number(cantidadSesiones || 1),
       frecuenciaSesiones
     );
+
     const listaBase = fechasProgramadas.map((fechaStr, idx) => ({
       art_nombre: nuevoViaje.art_nombre,
       modalidad_viaje: nuevoViaje.modalidad_viaje,
@@ -2434,11 +2647,13 @@ export default function App() {
       ],
       chat_mensajes: [],
     }));
+
     const listaExtendida = listaBase.map((item) => ({
       ...item,
       ...condicionesObj,
       condiciones_traslado: condicionesObj,
     }));
+
     let { data, error } = await supabase.from('traslados').insert(listaExtendida).select();
     if (error) {
       const listaRedondeada = listaBase.map((x) => ({ ...x, importe_total: Math.round(x.importe_total) }));
@@ -2446,16 +2661,19 @@ export default function App() {
       data = retry.data;
       error = retry.error;
     }
+
     if (error) {
       alert('Error al guardar traslado en Supabase: ' + error.message);
       return;
     }
+
     const insertados = (data || []).map((row) => ({
       ...row,
       importe_total: desglose.importeTotal,
       ...condicionesObj,
       condiciones_traslado: condicionesObj,
     }));
+
     setTraslados([...insertados, ...traslados]);
     if (insertados[0]) setViajeSeleccionadoId(insertados[0].id);
     setNuevoViaje({
@@ -2479,6 +2697,7 @@ export default function App() {
     setEsRecurrente(false);
     setTabAdmin('TORRE');
   };
+
   // ============================================================================
   // LINKS DE ACCESO INDEPENDIENTE (PACIENTE Y CHOFER) + ENVÍO POR WHATSAPP
   // ============================================================================
@@ -2486,14 +2705,17 @@ export default function App() {
     if (t?.token_paciente) return `${window.location.origin}/?token=${t.token_paciente}`;
     return `${window.location.origin}/?modo=paciente&traslado=${t?.id}`;
   };
+
   const construirUrlChoferViaje = (t) => {
     const ch = obtenerChoferDeTraslado(t);
     const chParam = ch?.id ? `&chofer=${ch.id}` : '';
     return `${window.location.origin}/?modo=chofer&traslado=${t?.id}${chParam}`;
   };
+
   const construirUrlPortalChofer = (choferId) => {
     return `${window.location.origin}/?modo=chofer&chofer=${choferId}`;
   };
+
   const enviarWhatsAppPaciente = (t) => {
     const veh = vehiculos.find((v) => v.id === t.vehiculo_id) || vehiculos[0];
     const ch = obtenerChoferDeTraslado(t);
@@ -2511,6 +2733,7 @@ export default function App() {
     );
     window.open(`https://wa.me/${telArg}?text=${mensaje}`, '_blank');
   };
+
   const enviarWhatsAppChofer = (t) => {
     const veh = vehiculos.find((v) => v.id === t.vehiculo_id) || vehiculos[0];
     const ch = obtenerChoferDeTraslado(t);
@@ -2531,6 +2754,7 @@ export default function App() {
     );
     window.open(`https://wa.me/${telArg}?text=${mensaje}`, '_blank');
   };
+
   // ============================================================================
   // EXPORTACIÓN EXCEL (.CSV) Y PDF AUDITADO CON CENTAVOS EXACTOS
   // ============================================================================
@@ -2539,6 +2763,7 @@ export default function App() {
       filtroArtLiquidacion === 'TODAS'
         ? traslados
         : traslados.filter((t) => t.art_nombre === filtroArtLiquidacion);
+
     const encabezados = [
       'Fecha',
       'Hora',
@@ -2562,6 +2787,7 @@ export default function App() {
       'Estado',
       'Importe Total ($)',
     ];
+
     const filas = filtrados.map((t) => {
       const veh = vehiculos.find((v) => v.id === t.vehiculo_id) || vehiculos[0];
       const ch = obtenerChoferDeTraslado(t);
@@ -2599,6 +2825,7 @@ export default function App() {
         formatearMoneda(t.importe_total || desglose.importeTotal),
       ].join(';');
     });
+
     const csv = '\uFEFF' + [encabezados.join(';'), ...filas].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -2607,6 +2834,7 @@ export default function App() {
     a.download = `Liquidacion_Erquenci_${filtroArtLiquidacion}_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
   };
+
   const descargarPdfLiquidacion = (t) => {
     const doc = new jsPDF();
     const veh = vehiculos.find((v) => v.id === t.vehiculo_id) || vehiculos[0];
@@ -2622,6 +2850,7 @@ export default function App() {
       kmDestinoABase: cond.km_destino_a_base,
       horasEsperaTotal: t.horas_espera || 0,
     });
+
     doc.setFillColor(30, 88, 141);
     doc.rect(0, 0, 210, 32, 'F');
     doc.setTextColor(255, 255, 255);
@@ -2629,6 +2858,7 @@ export default function App() {
     doc.text('ERQUENCI ART — COMPROBANTE DE TRASLADO AUDITADO', 14, 18);
     doc.setFontSize(10);
     doc.text(`Aseguradora: ${t.art_nombre} | Esquema: ${ESQUEMAS_LIQUIDACION_LABELS[cond.esquema_liquidacion] || cond.esquema_liquidacion}`, 14, 26);
+
     doc.setTextColor(30, 41, 59);
     doc.setFontSize(10.5);
     doc.text(`N° Siniestro / Autorización: ${t.numero_siniestro} | Fecha y Hora: ${t.fecha_programada} - ${t.hora_programada || ''} hs`, 14, 41);
@@ -2636,6 +2866,7 @@ export default function App() {
     doc.text(`Base Operativa (Inicio Odómetro): ${prest?.domicilio_base || 'Av. Moreno 37, San Rafael'} (CP ${cond.cp_base})`, 14, 55);
     doc.text(`Origen Paciente: ${t.origen_direccion} (CP ${cond.cp_origen})`, 14, 62);
     doc.text(`Destino Médico: ${t.destino_nombre} (CP ${cond.cp_destino})`, 14, 69);
+
     doc.setFillColor(241, 245, 249);
     doc.rect(14, 74, 182, 26, 'F');
     doc.setFontSize(9.5);
@@ -2661,6 +2892,7 @@ export default function App() {
     if (cond.observaciones_traslado) {
       doc.text(`• Detalle: ${cond.observaciones_traslado.slice(0, 95)}`, 17, 98);
     }
+
     doc.line(14, 104, 196, 104);
     doc.setFontSize(10);
     doc.text(`Prestador: ${prest?.razon_social || 'Erquenci S.A.S.'} (CUIT: ${prest?.cuit || '30-71792870-5'})`, 14, 111);
@@ -2673,19 +2905,23 @@ export default function App() {
     );
     doc.setFontSize(12);
     doc.text(`IMPORTE TOTAL LIQUIDACIÓN ART: $${formatearMoneda(t.importe_total || desglose.importeTotal)}`, 14, 141);
+
     doc.setFontSize(10);
     doc.text('Trazabilidad Horaria:', 14, 151);
     (t.eventos || []).forEach((ev, idx) => {
       doc.setFontSize(8.5);
       doc.text(`• [${ev.hora}] ${ev.estado}: ${(ev.detalle || '').slice(0, 90)}`, 16, 157 + idx * 5.5);
     });
+
     if (t.firma_url) {
       doc.setFontSize(10);
       doc.text('Conformidad Digital del Paciente:', 14, 188);
       doc.addImage(t.firma_url, 'PNG', 14, 192, 70, 26);
     }
+
     doc.save(`Liquidacion_${t.art_nombre}_${t.paciente_nombre}.pdf`);
   };
+
   const enviarMensajeChat = async (e) => {
     e.preventDefault();
     if (!nuevoMensaje.trim() || !viajeActivo) return;
@@ -2708,6 +2944,7 @@ export default function App() {
       await supabase.from('traslados').update({ chat_mensajes: listaActualizada }).eq('id', viajeActivo.id);
     }
   };
+
   const historialPacientes = Object.values(
     traslados.reduce((acc, t) => {
       const clave = (t.paciente_dni || t.paciente_nombre || 'SIN-DNI').trim();
@@ -2742,6 +2979,7 @@ export default function App() {
       (p.art_nombre || '').toLowerCase().includes(q)
     );
   });
+
   // ============================================================================
   // ABM DE CHOFERES, VEHÍCULOS Y PRESTADORES
   // ============================================================================
@@ -2761,12 +2999,15 @@ export default function App() {
     const { data, error } = await supabase.from('choferes').insert([payload]).select().single();
     const registro = data || { id: `ch-${Date.now()}`, ...payload };
     if (error) console.warn('Guardado local de chofer:', error.message);
+
     const nuevaLista = [...choferes, registro];
     setChoferes(nuevaLista);
     localStorage.setItem('erquenci_choferes_v3', JSON.stringify(nuevaLista));
+
     if (registro.vehiculo_habitual_id) {
       await asignarChoferAVehiculo(registro.vehiculo_habitual_id, registro.id, nuevaLista);
     }
+
     setNuevoChofer({
       ...nuevoChofer,
       nombre: '',
@@ -2775,6 +3016,7 @@ export default function App() {
       foto_url: '',
     });
   };
+
   const guardarEdicionChofer = async (e) => {
     e.preventDefault();
     if (!choferEditando) return;
@@ -2794,6 +3036,7 @@ export default function App() {
     const nuevaLista = choferes.map((c) => (c.id === choferEditando.id ? { ...c, ...patch } : c));
     setChoferes(nuevaLista);
     localStorage.setItem('erquenci_choferes_v3', JSON.stringify(nuevaLista));
+
     // Persistir la foto y datos actualizados del chofer también en los vehículos de Supabase para que el Paciente la vea en cualquier celular
     const vehiculosAfectados = vehiculos.filter(
       (v) =>
@@ -2812,6 +3055,7 @@ export default function App() {
         })
         .eq('id', v.id);
     }
+
     setVehiculos((prev) =>
       prev.map((v) =>
         vehiculosAfectados.some((af) => af.id === v.id)
@@ -2826,6 +3070,7 @@ export default function App() {
     );
     setChoferEditando(null);
   };
+
   const eliminarChofer = async (ch) => {
     if (!window.confirm(`¿Confirmás dar de baja / eliminar al chofer "${ch.nombre}"?`)) return;
     await supabase.from('choferes').delete().eq('id', ch.id);
@@ -2833,9 +3078,11 @@ export default function App() {
     setChoferes(nuevaLista);
     localStorage.setItem('erquenci_choferes_v3', JSON.stringify(nuevaLista));
   };
+
   const asignarChoferAVehiculo = async (vehiculoId, nuevoChoferId, listaChoferesRef = choferes) => {
     const ch = listaChoferesRef.find((c) => c.id === nuevoChoferId);
     if (!ch) return;
+
     const patchBase = {
       chofer_nombre: ch.nombre,
       chofer_foto: ch.foto_url,
@@ -2845,12 +3092,14 @@ export default function App() {
       ...patchBase,
       chofer_id: ch.id,
     };
+
     setVehiculos((prev) => prev.map((v) => (v.id === vehiculoId ? { ...v, ...patchExt } : v)));
     let { error } = await supabase.from('vehiculos').update(patchExt).eq('id', vehiculoId);
     if (error) {
       await supabase.from('vehiculos').update(patchBase).eq('id', vehiculoId);
     }
   };
+
   const guardarEdicionVehiculo = async (e) => {
     e.preventDefault();
     if (!vehiculoEditando) return;
@@ -2876,6 +3125,7 @@ export default function App() {
       ...patchBase,
       chofer_id: ch?.id || null,
     };
+
     let { error } = await supabase.from('vehiculos').update(patchExt).eq('id', vehiculoEditando.id);
     if (error) {
       await supabase.from('vehiculos').update(patchBase).eq('id', vehiculoEditando.id);
@@ -2885,11 +3135,13 @@ export default function App() {
     );
     setVehiculoEditando(null);
   };
+
   const eliminarVehiculo = async (v) => {
     if (!window.confirm(`¿Confirmás eliminar el vehículo ${v.patente} (${v.modelo}) de la flota?`)) return;
     await supabase.from('vehiculos').delete().eq('id', v.id);
     setVehiculos((prev) => prev.filter((item) => item.id !== v.id));
   };
+
   const guardarEdicionPrestador = async (e) => {
     e.preventDefault();
     if (!prestadorEditando) return;
@@ -2906,6 +3158,7 @@ export default function App() {
       base_lat: prestadorEditando.base_lat || -34.6158,
       base_lng: prestadorEditando.base_lng || -68.3285,
     };
+
     let { error } = await supabase.from('prestadores').update(patchExt).eq('id', prestadorEditando.id);
     if (error) {
       await supabase.from('prestadores').update(patchBase).eq('id', prestadorEditando.id);
@@ -2915,23 +3168,28 @@ export default function App() {
     );
     setPrestadorEditando(null);
   };
+
   const eliminarPrestador = async (p) => {
     if (!window.confirm(`¿Confirmás eliminar al prestador "${p.razon_social}"?`)) return;
     await supabase.from('prestadores').delete().eq('id', p.id);
     setPrestadores((prev) => prev.filter((item) => item.id !== p.id));
   };
+
   const actualizarCampoTarifaArt = async (nombreArt, campo, valor) => {
     const nuevas = tarifasArt.map((item) =>
       item.nombre_art === nombreArt ? { ...item, [campo]: valor } : item
     );
     setTarifasArt(nuevas);
+
     const mapa = {};
     nuevas.forEach((t) => {
       mapa[t.nombre_art] = t;
     });
     localStorage.setItem('erquenci_tarifas_v3', JSON.stringify(mapa));
+
     await supabase.from('tarifas_art').update({ [campo]: valor }).eq('nombre_art', nombreArt);
   };
+
   const guardarMapaTarifasLocal = (lista) => {
     const mapa = {};
     lista.forEach((t) => {
@@ -2939,6 +3197,7 @@ export default function App() {
     });
     localStorage.setItem('erquenci_tarifas_v3', JSON.stringify(mapa));
   };
+
   const abrirNuevaArt = () => {
     setArtEditandoNombre(null);
     setFormArt({
@@ -2954,6 +3213,7 @@ export default function App() {
     });
     setMostrarFormArt(true);
   };
+
   const abrirEditarArt = (tar) => {
     setArtEditandoNombre(tar.nombre_art);
     setFormArt({
@@ -2969,10 +3229,12 @@ export default function App() {
     });
     setMostrarFormArt(true);
   };
+
   const guardarArt = async (e) => {
     e.preventDefault();
     const nombreLimpio = (formArt.nombre_art || '').trim();
     if (!nombreLimpio) return alert('Ingresá el nombre de la ART.');
+
     const existeDuplicada = tarifasArt.some(
       (t) =>
         t.nombre_art.toLowerCase() === nombreLimpio.toLowerCase() &&
@@ -2981,6 +3243,7 @@ export default function App() {
     if (existeDuplicada) {
       return alert(`Ya existe una ART llamada "${nombreLimpio}".`);
     }
+
     const payload = {
       nombre_art: nombreLimpio,
       valor_tramo_1: Number(formArt.valor_tramo_1 || 0),
@@ -2992,6 +3255,7 @@ export default function App() {
       modo_facturacion_default: formArt.modo_facturacion_default || 'URBANO_TRAMOS_Y_KM_CP',
       regla_km: formArt.regla_km || 'SOLO_IDA_PACIENTE',
     };
+
     if (artEditandoNombre) {
       const nuevas = tarifasArt.map((t) =>
         t.nombre_art === artEditandoNombre ? { ...t, ...payload } : t
@@ -3013,9 +3277,11 @@ export default function App() {
       setTarifasArt(nuevas);
       guardarMapaTarifasLocal(nuevas);
     }
+
     setMostrarFormArt(false);
     setArtEditandoNombre(null);
   };
+
   const eliminarArt = async (tar) => {
     if (tarifasArt.length <= 1) {
       return alert('Debe quedar al menos una ART activa en el sistema.');
@@ -3026,6 +3292,7 @@ export default function App() {
     guardarMapaTarifasLocal(nuevas);
     await supabase.from('tarifas_art').delete().eq('nombre_art', tar.nombre_art);
   };
+
   // PANTALLA DE LOGIN REAL
   if (!modoDemo && !session && !esAccesoExclusivoPaciente && !esAccesoExclusivoChofer) {
     return (
@@ -3072,6 +3339,7 @@ export default function App() {
       </div>
     );
   }
+
   const trasladosLiquidacion =
     filtroArtLiquidacion === 'TODAS'
       ? traslados
@@ -3079,6 +3347,7 @@ export default function App() {
   const totalFacturarFiltrado = +trasladosLiquidacion
     .reduce((acc, t) => acc + Number(t.importe_total || 0), 0)
     .toFixed(2);
+
   // Vista previa en vivo del cálculo tarifario al derivar un nuevo traslado
   const prestadorFormViaje = prestadores.find((p) => p.id === nuevoViaje.prestador_id) || prestadores[0];
   const cpBaseForm = String(prestadorFormViaje?.codigo_postal_base || '5600').trim();
@@ -3119,57 +3388,103 @@ export default function App() {
     kmDestinoABase: kmDestBaseForm,
     horasEsperaTotal: 0,
   });
+
   const hayTrasladosLocalesSinImpactar = false;
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <style>{`
         @keyframes erqTabEnter {
-          0% { opacity: 0; transform: translateY(10px) scale(0.995); }
-          100% { opacity: 1; transform: translateY(0) scale(1); }
+          0% { opacity: 0; transform: translateY(14px) scale(0.988); filter: blur(3px); }
+          100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0px); }
         }
         @keyframes erqTopBar {
           0% { width: 0%; opacity: 1; }
-          65% { width: 82%; opacity: 1; }
+          60% { width: 84%; opacity: 1; }
           100% { width: 100%; opacity: 0; }
         }
-        @keyframes erqSplashBar {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(0%); }
+        @keyframes erqBtnEnter {
+          0% { opacity: 0; transform: translateY(12px) scale(0.94); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes erqFloatSlow {
+          0%, 100% { transform: translateY(0px) scale(1); }
+          50% { transform: translateY(-10px) scale(1.04); }
         }
         .animate-erq-tab-enter {
-          animation: erqTabEnter 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+          animation: erqTabEnter 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
         }
         .animate-erq-top-bar {
-          animation: erqTopBar 440ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+          animation: erqTopBar 450ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
         }
-        .animate-erq-splash-bar {
-          animation: erqSplashBar 750ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        .animate-erq-btn-enter {
+          animation: erqBtnEnter 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+        .animate-erq-float {
+          animation: erqFloatSlow 5s ease-in-out infinite;
         }
       `}</style>
+
       {/* BARRA DE PROGRESO SUPERIOR AL CAMBIAR DE PESTAÑA O VISTA */}
       {barraCargaTab && (
-        <div className="fixed top-0 left-0 right-0 h-[3px] z-[60] pointer-events-none bg-transparent">
-          <div className="h-full bg-gradient-to-r from-[#34B37B] via-[#268786] to-[#1E588D] animate-erq-top-bar shadow-[0_0_8px_rgba(52,179,123,0.7)]" />
+        <div className="fixed top-0 left-0 right-0 h-[3.5px] z-[60] pointer-events-none bg-slate-900/10">
+          <div className="h-full bg-gradient-to-r from-[#34B37B] via-[#38bdf8] to-[#1E588D] animate-erq-top-bar shadow-[0_0_12px_rgba(52,179,123,0.85)]" />
         </div>
       )}
-      {/* SPLASH SCREEN PROFESIONAL AL ABRIR LA PÁGINA */}
+
+      {/* SPLASH SCREEN PROFESIONAL CON BOTÓN DE INGRESO */}
       {splashEstado !== 'OCULTO' && (
         <div
-          className={`fixed inset-0 z-[70] flex flex-col items-center justify-center bg-gradient-to-br from-slate-950 via-[#0f2942] to-[#103b38] text-white transition-opacity duration-400 ${
-            splashEstado === 'SALIENDO' ? 'opacity-0 pointer-events-none' : 'opacity-100'
+          className={`fixed inset-0 z-[70] flex flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-slate-950 via-[#0d243c] to-[#0b3330] text-white transition-all duration-500 ${
+            splashEstado === 'SALIENDO' ? 'opacity-0 scale-105 pointer-events-none' : 'opacity-100 scale-100'
           }`}
         >
-          <div className="flex flex-col items-center gap-4 px-6 text-center">
-            <div className="bg-white/95 px-6 py-4 rounded-2xl shadow-2xl border border-white/20">
-              <ErquenciLogo subtitle="Plataforma Operativa ART" />
+          {/* Orbes ambientales animados */}
+          <div className="absolute -top-24 -left-24 w-80 h-80 rounded-full bg-[#34B37B]/20 blur-3xl animate-erq-float pointer-events-none" />
+          <div className="absolute -bottom-24 -right-24 w-96 h-96 rounded-full bg-[#1E588D]/30 blur-3xl animate-erq-float pointer-events-none" />
+
+          <div className="relative z-10 flex flex-col items-center gap-5 px-6 max-w-md w-full text-center">
+            <div className="bg-white/95 px-7 py-5 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.45)] border border-white/30 transform transition-transform duration-500 hover:scale-[1.02]">
+              <ErquenciLogo subtitle="Plataforma Operativa ART • GPS en Vivo" />
             </div>
-            <div className="w-56 h-1.5 bg-white/15 rounded-full overflow-hidden mt-2">
-              <div className="w-full h-full bg-gradient-to-r from-[#34B37B] to-[#38bdf8] rounded-full animate-erq-splash-bar" />
+
+            <div className="w-full max-w-xs space-y-2 mt-1">
+              <div className="flex items-center justify-between text-[11px] font-bold tracking-wider uppercase text-emerald-200/90">
+                <span className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${splashProgreso < 100 ? 'bg-amber-400 animate-ping' : 'bg-[#34B37B]'}`} />
+                  {splashProgreso < 50
+                    ? 'Conectando con Supabase...'
+                    : splashProgreso < 100
+                    ? 'Sincronizando flota y traslados...'
+                    : 'Sistema Operativo Listo'}
+                </span>
+                <span>{splashProgreso}%</span>
+              </div>
+              <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden border border-white/10">
+                <div
+                  className="h-full bg-gradient-to-r from-[#34B37B] via-[#38bdf8] to-[#1E588D] rounded-full transition-all duration-300 ease-out shadow-[0_0_12px_rgba(52,179,123,0.75)]"
+                  style={{ width: `${splashProgreso}%` }}
+                />
+              </div>
             </div>
-            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-200/90 tracking-wide">
-              <span className="w-2 h-2 rounded-full bg-[#34B37B] animate-ping" />
-              <span>Sincronizando Torre de Control y GPS en vivo...</span>
-            </div>
+
+            {splashProgreso === 100 && (
+              <button
+                type="button"
+                onClick={ingresarDesdeSplash}
+                className="animate-erq-btn-enter mt-2 group relative inline-flex items-center justify-center gap-2.5 px-7 py-3.5 rounded-2xl font-extrabold text-xs sm:text-sm tracking-wider uppercase text-white bg-gradient-to-r from-[#34B37B] via-[#268786] to-[#1E588D] shadow-[0_12px_35px_rgba(52,179,123,0.45)] hover:shadow-[0_16px_45px_rgba(56,189,248,0.55)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 border border-white/25 cursor-pointer"
+              >
+                <ShieldCheck className="w-5 h-5 text-emerald-100 group-hover:scale-110 transition-transform" />
+                <span>
+                  {esAccesoExclusivoChofer
+                    ? 'INGRESAR A MI HOJA DE RUTA'
+                    : esAccesoExclusivoPaciente
+                    ? 'VER SEGUIMIENTO DEL TRASLADO'
+                    : 'INGRESAR A LA TORRE DE CONTROL'}
+                </span>
+                <Navigation className="w-4 h-4 rotate-90 group-hover:translate-x-1 transition-transform" />
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -3179,6 +3494,7 @@ export default function App() {
           <span>{linkCopiadoMsg}</span>
         </div>
       )}
+
       {/* BARRA SUPERIOR */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
@@ -3195,6 +3511,7 @@ export default function App() {
                 : 'Portal Seguro del Paciente'
             }
           />
+
           {modoDemo && !esAccesoExclusivoPaciente && !esAccesoExclusivoChofer && (
             <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
               <button
@@ -3223,6 +3540,7 @@ export default function App() {
               </button>
             </div>
           )}
+
           {!esAccesoExclusivoPaciente && !esAccesoExclusivoChofer && (
             <div className="flex items-center gap-3">
               <button
@@ -3245,6 +3563,7 @@ export default function App() {
           )}
         </div>
       </header>
+
       {/* ==================================================================== */}
       {/* VISTA 1: TORRE DE CONTROL ART                                        */}
       {/* ==================================================================== */}
@@ -3271,6 +3590,7 @@ export default function App() {
               </button>
             </div>
           )}
+
           {/* ALERTA DESPERFECTO */}
           {traslados.some((t) => t.estado === 'ALERTA_DESPERFECTO') && (
             <div className="bg-red-50 border-2 border-red-500 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-md animate-pulse">
@@ -3304,6 +3624,7 @@ export default function App() {
                 ))}
             </div>
           )}
+
           {/* SUB-NAVEGACIÓN */}
           <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
             <button
@@ -3355,6 +3676,7 @@ export default function App() {
               <Building2 className="w-4 h-4" /> Prestadores y Base Operativa ({prestadores.length})
             </button>
           </div>
+
           <div key={tabAdmin} className="animate-erq-tab-enter space-y-6">
           {/* PESTAÑA 1: MONITOREO + FILTROS + LINKS INDEPENDIENTES */}
           {tabAdmin === 'TORRE' && (
@@ -3364,6 +3686,7 @@ export default function App() {
                 vehiculos={vehiculos}
                 obtenerNombreChofer={(t) => obtenerChoferDeTraslado(t)?.nombre || 'Matías Emanuel Gatica'}
               />
+
               {/* BARRA DE BUSCADOR Y FILTROS AVANZADOS */}
               <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -3391,6 +3714,7 @@ export default function App() {
                     </button>
                   )}
                 </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 text-xs">
                   <div className="relative">
                     <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
@@ -3402,6 +3726,7 @@ export default function App() {
                       className="w-full border border-slate-200 rounded-xl pl-8 pr-3 py-2 bg-slate-50 focus:bg-white outline-none"
                     />
                   </div>
+
                   <select
                     value={filtroArtTorre}
                     onChange={(e) => setFiltroArtTorre(e.target.value)}
@@ -3414,6 +3739,7 @@ export default function App() {
                       </option>
                     ))}
                   </select>
+
                   <select
                     value={filtroEstadoTorre}
                     onChange={(e) => setFiltroEstadoTorre(e.target.value)}
@@ -3429,6 +3755,7 @@ export default function App() {
                     <option value="FINALIZADO">Finalizado</option>
                     <option value="ALERTA_DESPERFECTO">Alerta Desperfecto</option>
                   </select>
+
                   <select
                     value={filtroCondicionTorre}
                     onChange={(e) => setFiltroCondicionTorre(e.target.value)}
@@ -3439,6 +3766,7 @@ export default function App() {
                     <option value="CON_SILLA_RUEDAS">♿ Con Muletas / Silla de Ruedas</option>
                     <option value="VEHICULO_ESPECIAL">⚖️ Vehículo Especial / +120-150 kg</option>
                   </select>
+
                   <div className="flex gap-1.5">
                     <input
                       type="date"
@@ -3458,6 +3786,7 @@ export default function App() {
                   </div>
                 </div>
               </div>
+
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-4">
                   {trasladosFiltradosTorre.length === 0 ? (
@@ -3520,9 +3849,11 @@ export default function App() {
                               {t.estado.replace(/_/g, ' ')}
                             </span>
                           </div>
+
                           <div className="mb-3">
                             <BadgesCondicionesTraslado traslado={t} mostrarObservaciones={true} />
                           </div>
+
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-600 bg-slate-50 p-3 rounded-xl mb-3">
                             <div className="flex items-center gap-2">
                               <MapPin className="w-4 h-4 text-[#34B37B] shrink-0" />
@@ -3533,6 +3864,7 @@ export default function App() {
                               <span><strong>Destino:</strong> {t.destino_nombre}</span>
                             </div>
                           </div>
+
                           {/* BARRA DE LINKS INDEPENDIENTES PARA COMPARTIR (CHOFER Y PACIENTE) */}
                           <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-blue-50/50 border border-blue-100 mb-3 text-xs">
                             <div className="flex flex-wrap items-center gap-1.5">
@@ -3558,6 +3890,7 @@ export default function App() {
                                 <MessageCircle className="w-3 h-3" /> WA Paciente
                               </button>
                             </div>
+
                             <div className="flex flex-wrap items-center gap-1.5">
                               <button
                                 type="button"
@@ -3581,6 +3914,7 @@ export default function App() {
                               </button>
                             </div>
                           </div>
+
                           <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100">
                             <div className="flex items-center gap-2.5">
                               {ch?.foto_url && (
@@ -3593,6 +3927,7 @@ export default function App() {
                                 </div>
                               </div>
                             </div>
+
                             <div className="flex flex-wrap items-center gap-1.5">
                               <button
                                 type="button"
@@ -3632,6 +3967,7 @@ export default function App() {
                     })
                   )}
                 </div>
+
                 {/* PANEL DERECHO: AUDITORÍA + ESQUEMA DE LIQUIDACIÓN Y HORAS DE ESPERA CON FRANQUICIA */}
                 <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4 h-fit">
                   <div className="flex items-center justify-between">
@@ -3648,6 +3984,7 @@ export default function App() {
                       </button>
                     )}
                   </div>
+
                   {viajeActivo ? (
                     (() => {
                       const metaActivo = obtenerMetaTraslado(viajeActivo);
@@ -3668,10 +4005,12 @@ export default function App() {
                             </div>
                             <BadgesCondicionesTraslado traslado={viajeActivo} mostrarObservaciones={true} />
                           </div>
+
                           <div className="p-3.5 bg-blue-50/60 border border-blue-200 rounded-xl space-y-3">
                             <div className="text-xs font-bold text-[#1E588D]">
                               Regla de Liquidación ({viajeActivo.art_nombre})
                             </div>
+
                             <div>
                               <label className="text-[10px] font-bold text-slate-600 block mb-1">
                                 Esquema de Cobro Pactado
@@ -3690,6 +4029,7 @@ export default function App() {
                                 ))}
                               </select>
                             </div>
+
                             <div className="grid grid-cols-3 gap-1.5 text-xs">
                               <div>
                                 <label className="text-[10px] font-bold text-slate-500">KM Base→Dom</label>
@@ -3728,6 +4068,7 @@ export default function App() {
                                 />
                               </div>
                             </div>
+
                             <div className="grid grid-cols-2 gap-2 text-xs items-end">
                               <div>
                                 <label className="text-[10px] font-bold text-slate-500">
@@ -3753,9 +4094,11 @@ export default function App() {
                                 </div>
                               </div>
                             </div>
+
                             <div className="text-[11px] text-slate-600 bg-white/80 p-2 rounded-lg border border-blue-100">
                               <strong>Fórmula aplicada:</strong> {desgloseActivo.descripcionCalculo}
                             </div>
+
                             <div className="flex justify-between items-center pt-1 border-t border-blue-200/60 text-xs">
                               <span className="font-semibold text-slate-700">Total a liquidar ART:</span>
                               <span className="text-base font-extrabold text-[#1E588D]">
@@ -3763,6 +4106,7 @@ export default function App() {
                               </span>
                             </div>
                           </div>
+
                           <div className="space-y-2 border-l-2 border-[#34B37B] pl-3 ml-1">
                             {(viajeActivo.eventos || []).map((ev, i) => (
                               <div key={i} className="text-xs">
@@ -3772,6 +4116,7 @@ export default function App() {
                               </div>
                             ))}
                           </div>
+
                           {viajeActivo.firma_url ? (
                             <div className="pt-3 border-t border-slate-100">
                               <p className="text-xs font-bold text-emerald-700 mb-1">✓ Conformidad Firmada por Paciente:</p>
@@ -3792,6 +4137,7 @@ export default function App() {
               </div>
             </div>
           )}
+
           {/* PESTAÑA 2: DERIVAR NUEVO TRASLADO */}
           {tabAdmin === 'NUEVO_VIAJE' && (
             <form onSubmit={crearNuevoTraslado} className="bg-white rounded-2xl border border-slate-200 p-6 max-w-3xl space-y-5 shadow-sm">
@@ -3803,6 +4149,7 @@ export default function App() {
                   </p>
                 </div>
               </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Aseguradora / ART</label>
@@ -3829,6 +4176,7 @@ export default function App() {
                     <option value="SOLO_IDA">Solo Ida ($5.630,04 en Radio Céntrico)</option>
                   </select>
                 </div>
+
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Fecha Programada</label>
                   <input
@@ -3849,6 +4197,7 @@ export default function App() {
                     className="w-full border rounded-xl px-3 py-2 text-sm"
                   />
                 </div>
+
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Nombre del Paciente</label>
                   <input required value={nuevoViaje.paciente_nombre} onChange={(e) => setNuevoViaje({ ...nuevoViaje, paciente_nombre: e.target.value })} className="w-full border rounded-xl px-3 py-2 text-sm" placeholder="Ej: CASADO, JOSE MARIA" />
@@ -3865,7 +4214,9 @@ export default function App() {
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Teléfono WhatsApp</label>
                   <input required value={nuevoViaje.paciente_telefono} onChange={(e) => setNuevoViaje({ ...nuevoViaje, paciente_telefono: e.target.value })} className="w-full border rounded-xl px-3 py-2 text-sm" placeholder="2604..." />
                 </div>
+
                 <FormularioCondicionesTraslado state={nuevoViaje} onChange={setNuevoViaje} />
+
                 <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-4 gap-2.5 items-end">
                   <div className="sm:col-span-3 space-y-1">
                     <label className="block text-xs font-semibold text-slate-600">Domicilio de Retiro del Paciente</label>
@@ -3898,6 +4249,7 @@ export default function App() {
                     />
                   </div>
                 </div>
+
                 {/* Centro Médico + ABM Completo */}
                 <div className="sm:col-span-2 space-y-2.5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -3926,6 +4278,7 @@ export default function App() {
                       </button>
                     </div>
                   </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
                     <select
                       value={nuevoViaje.destino_nombre}
@@ -3962,6 +4315,7 @@ export default function App() {
                       />
                     </div>
                   </div>
+
                   {mostrarFormCentro && (
                     <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-xl space-y-2.5">
                       <div className="text-xs font-bold text-[#1E588D]">Nuevo Centro Médico / Clínica</div>
@@ -3999,6 +4353,7 @@ export default function App() {
                       </div>
                     </div>
                   )}
+
                   {mostrarGestorCentros && (
                     <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
                       <div className="text-xs font-bold text-slate-800">
@@ -4079,6 +4434,7 @@ export default function App() {
                     </div>
                   )}
                 </div>
+
                 {/* Esquema de Liquidación Automático por Código Postal o Manual */}
                 <div className="sm:col-span-2 p-4 rounded-2xl bg-blue-50/60 border border-blue-200 space-y-2.5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -4098,6 +4454,7 @@ export default function App() {
                         : `Mismo Código Postal (${cpBaseForm}): Radio Céntrico por Tramo`}
                     </span>
                   </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                     <div>
                       <label className="block font-semibold text-slate-700 mb-1">
@@ -4126,6 +4483,7 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+
                 {/* Selección Independiente de Vehículo y Chofer */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">
@@ -4156,6 +4514,7 @@ export default function App() {
                     })}
                   </select>
                 </div>
+
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">
                     Elegir Chofer para este Viaje (Independiente del Auto)
@@ -4176,6 +4535,7 @@ export default function App() {
                     })}
                   </select>
                 </div>
+
                 {/* Programación Recurrente (Sesiones FKT / Rehabilitación, ej. 5 días MULETAS) */}
                 <div className="sm:col-span-2 p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
                   <label className="flex items-center justify-between cursor-pointer">
@@ -4219,6 +4579,7 @@ export default function App() {
                   )}
                 </div>
               </div>
+
               <button type="submit" className="px-5 py-2.5 bg-[#34B37B] hover:bg-[#2a9666] text-white font-bold rounded-xl text-sm shadow">
                 {esRecurrente
                   ? `Confirmar y Generar ${cantidadSesiones} Traslados Recurrentes`
@@ -4226,6 +4587,7 @@ export default function App() {
               </button>
             </form>
           )}
+
           {/* PESTAÑA 3: HISTORIAL POR PACIENTE */}
           {tabAdmin === 'HISTORIAL' && (
             <div className="space-y-4">
@@ -4250,6 +4612,7 @@ export default function App() {
                   />
                 </div>
               </div>
+
               <div className="space-y-3">
                 {historialPacientes.map((p) => {
                   const abierto = pacienteHistorialExpandido === p.clave;
@@ -4272,6 +4635,7 @@ export default function App() {
                           </div>
                           <BadgesCondicionesTraslado traslado={p.ultimo_traslado} mostrarObservaciones={true} />
                         </div>
+
                         <div className="flex flex-wrap items-center gap-3">
                           <div className="text-right bg-slate-50 px-3 py-2 rounded-xl border border-slate-100">
                             <div className="text-[10px] font-bold uppercase text-slate-400">
@@ -4281,6 +4645,7 @@ export default function App() {
                               ${formatearMoneda(p.total_importe)}
                             </div>
                           </div>
+
                           <button
                             type="button"
                             onClick={() => repetirTrasladoPaciente(p.ultimo_traslado)}
@@ -4297,6 +4662,7 @@ export default function App() {
                           </button>
                         </div>
                       </div>
+
                       {abierto && (
                         <div className="border-t border-slate-100 bg-slate-50/70 p-4 overflow-x-auto">
                           <table className="w-full text-left text-xs border-collapse">
@@ -4352,6 +4718,7 @@ export default function App() {
               </div>
             </div>
           )}
+
           {/* PESTAÑA 4: LIQUIDACIÓN Y TARIFAS AVANZADAS POR ART */}
           {tabAdmin === 'LIQUIDACION' && (
             <div className="space-y-6">
@@ -4373,6 +4740,7 @@ export default function App() {
                     <Plus className="w-4 h-4" /> Nueva ART
                   </button>
                 </div>
+
                 {mostrarFormArt && (
                   <form onSubmit={guardarArt} className="p-4 rounded-2xl border-2 border-[#1E588D]/30 bg-blue-50/40 space-y-3 text-xs">
                     <div className="flex items-center justify-between">
@@ -4500,6 +4868,7 @@ export default function App() {
                     </div>
                   </form>
                 )}
+
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {tarifasArt.map((tar) => (
                     <div key={tar.nombre_art} className="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-3 text-xs">
@@ -4529,6 +4898,7 @@ export default function App() {
                           </button>
                         </div>
                       </div>
+
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         <div className="sm:col-span-2">
                           <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
@@ -4548,6 +4918,7 @@ export default function App() {
                             ))}
                           </select>
                         </div>
+
                         <div>
                           <label className="text-[10px] font-bold text-teal-800 block mb-0.5">
                             Radio Céntrico Ida — Tramo 1 ($)
@@ -4576,6 +4947,7 @@ export default function App() {
                             className="w-full border bg-white rounded-lg px-2.5 py-1.5 font-bold text-teal-900"
                           />
                         </div>
+
                         <div>
                           <label className="text-[10px] font-bold text-[#1E588D] block mb-0.5">
                             Valor por KM ($) (Fuera de Radio / CP)
@@ -4590,6 +4962,7 @@ export default function App() {
                             className="w-full border bg-white rounded-lg px-2.5 py-1.5 font-bold text-[#1E588D]"
                           />
                         </div>
+
                         <div>
                           <label className="text-[10px] font-bold text-[#1E588D] block mb-0.5">
                             Modalidad de Conteo de KM
@@ -4606,6 +4979,7 @@ export default function App() {
                             ))}
                           </select>
                         </div>
+
                         <div>
                           <label className="text-[10px] font-bold text-amber-800 block mb-0.5">
                             Valor Hora de Espera ($)
@@ -4620,6 +4994,7 @@ export default function App() {
                             className="w-full border bg-white rounded-lg px-2.5 py-1.5 font-bold"
                           />
                         </div>
+
                         <div>
                           <label className="text-[10px] font-bold text-amber-800 block mb-0.5">
                             Espera: ¿A partir de cuántas hs suma?
@@ -4642,6 +5017,7 @@ export default function App() {
                   ))}
                 </div>
               </div>
+
               <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
@@ -4659,6 +5035,7 @@ export default function App() {
                       ))}
                     </select>
                   </div>
+
                   <div className="flex items-center gap-4">
                     <div className="text-right">
                       <div className="text-[10px] uppercase font-bold text-slate-400">Total a Facturar</div>
@@ -4674,6 +5051,7 @@ export default function App() {
                     </button>
                   </div>
                 </div>
+
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
@@ -4738,6 +5116,7 @@ export default function App() {
               </div>
             </div>
           )}
+
           {/* PESTAÑA 5: FLOTA (5 VENCIMIENTOS) Y CHOFERES INDEPENDIENTES POR EMPRESA */}
           {tabAdmin === 'FLOTA' && (
             <div className="space-y-8">
@@ -4751,6 +5130,7 @@ export default function App() {
                     Podés cambiar en 1 clic qué chofer de la empresa está hoy al volante de cada auto o modificar/eliminar unidades.
                   </p>
                 </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {vehiculos.map((v) => {
                     const prest = prestadores.find((p) => p.id === v.prestador_id);
@@ -4759,6 +5139,7 @@ export default function App() {
                     const bloqueado = vehiculoEstaBloqueado(v);
                     const evalLic = evaluarVencimiento(choferActual?.licencia_venc || v.licencia_venc);
                     const docsNorm = normalizarDocsVehiculo(v.docs);
+
                     return (
                       <div
                         key={v.id}
@@ -4810,10 +5191,12 @@ export default function App() {
                             </button>
                           </div>
                         </div>
+
                         <div>
                           <h4 className="font-bold text-slate-900 text-sm">{v.modelo}</h4>
                           <p className="text-xs text-slate-500">{prest?.razon_social}</p>
                         </div>
+
                         <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
                           <div className="flex items-center gap-2.5">
                             <img
@@ -4836,6 +5219,7 @@ export default function App() {
                               </span>
                             </div>
                           </div>
+
                           <div>
                             <label className="text-[10px] font-bold text-[#1E588D] block mb-1">
                               Cambiar Chofer del Auto (Reemplazo / Turno):
@@ -4853,6 +5237,7 @@ export default function App() {
                             </select>
                           </div>
                         </div>
+
                         <div className="space-y-1.5 pt-2 border-t border-slate-100">
                           <div className="text-[10px] font-bold uppercase text-slate-400">
                             Vencimientos del Vehículo:
@@ -4876,6 +5261,7 @@ export default function App() {
                     );
                   })}
                 </div>
+
                 {/* Formulario Alta de Nuevo Vehículo */}
                 <form
                   onSubmit={async (e) => {
@@ -4900,6 +5286,7 @@ export default function App() {
                       ],
                     };
                     const payloadExt = { ...payloadBase, chofer_id: ch?.id || null };
+
                     let { data, error } = await supabase.from('vehiculos').insert([payloadExt]).select().single();
                     if (error) {
                       const retry = await supabase.from('vehiculos').insert([payloadBase]).select().single();
@@ -4953,6 +5340,7 @@ export default function App() {
                         className="w-full border rounded-xl px-3 py-2 mt-0.5"
                       />
                     </div>
+
                     <div>
                       <label className="text-[10px] font-bold text-slate-500">Capacidad / Tipo de Unidad</label>
                       <select
@@ -4965,6 +5353,7 @@ export default function App() {
                         <option value="AMBULATORIO">Ambulatorio Estándar</option>
                       </select>
                     </div>
+
                     <div className="sm:col-span-2">
                       <label className="text-[10px] font-bold text-slate-500">Chofer Titular Inicial</label>
                       <select
@@ -4979,6 +5368,7 @@ export default function App() {
                         ))}
                       </select>
                     </div>
+
                     <div>
                       <label className="text-[10px] font-bold text-slate-500">1. Venc. Seguro</label>
                       <input
@@ -5030,6 +5420,7 @@ export default function App() {
                   </button>
                 </form>
               </div>
+
               {/* SECCIÓN B: CHOFERES POR EMPRESA */}
               <div className="space-y-4 pt-4 border-t border-slate-200">
                 <div>
@@ -5041,6 +5432,7 @@ export default function App() {
                     Cargá varios choferes por empresa, controlá el vencimiento de su Licencia Nacional de Conducir, compartiles su link exclusivo de trabajo o dalos de baja si renuncian.
                   </p>
                 </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {choferes.map((c) => {
                     const prest = prestadores.find((p) => p.id === c.prestador_id);
@@ -5066,6 +5458,7 @@ export default function App() {
                               </p>
                             </div>
                           </div>
+
                           <div className="flex items-center gap-1">
                             <button
                               type="button"
@@ -5085,18 +5478,21 @@ export default function App() {
                             </button>
                           </div>
                         </div>
+
                         <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100">
                           <span className="font-medium text-slate-600">Venc. Licencia:</span>
                           <span className={`px-2 py-0.5 rounded border text-[10px] font-bold ${evLic.badge}`}>
                             {c.licencia_venc} ({evLic.estado})
                           </span>
                         </div>
+
                         <div className="flex items-center justify-between text-xs">
                           <span className="font-medium text-slate-600">Móvil Habitual:</span>
                           <span className="font-bold text-slate-800">
                             {autoHab ? `${autoHab.patente} (${autoHab.modelo})` : 'Rotativo / Suplente'}
                           </span>
                         </div>
+
                         <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
                           <button
                             type="button"
@@ -5112,6 +5508,7 @@ export default function App() {
                     );
                   })}
                 </div>
+
                 {/* Formulario Alta de Nuevo Chofer */}
                 <form onSubmit={guardarNuevoChofer} className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
                   <h4 className="font-bold text-sm text-slate-900">
@@ -5185,6 +5582,7 @@ export default function App() {
                         ))}
                       </select>
                     </div>
+
                     <div className="sm:col-span-3 flex items-center gap-3 border rounded-xl px-3 py-2 bg-slate-50">
                       {nuevoChofer.foto_url ? (
                         <img src={nuevoChofer.foto_url} alt="Preview" className="w-9 h-9 rounded-full object-cover border" />
@@ -5216,6 +5614,7 @@ export default function App() {
               </div>
             </div>
           )}
+
           {/* PESTAÑA 6: PRESTADORES Y DOMICILIO DE BASE OPERATIVA */}
           {tabAdmin === 'PRESTADORES' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -5250,6 +5649,7 @@ export default function App() {
                         </button>
                       </div>
                     </div>
+
                     <div className="p-2.5 rounded-xl bg-blue-50/60 border border-blue-100 text-xs flex items-center justify-between">
                       <div>
                         <span className="font-bold text-[#1E588D] block text-[11px]">
@@ -5263,6 +5663,7 @@ export default function App() {
                   </div>
                 ))}
               </div>
+
               <form
                 onSubmit={async (e) => {
                   e.preventDefault();
@@ -5271,6 +5672,7 @@ export default function App() {
                     ? await buscarCoordenadasDireccion(nuevoPrestador.domicilio_base)
                     : null;
                   setBuscandoGeo(false);
+
                   const payloadBase = {
                     razon_social: nuevoPrestador.razon_social,
                     cuit: nuevoPrestador.cuit,
@@ -5285,6 +5687,7 @@ export default function App() {
                     base_lat: coords?.lat || -34.6158,
                     base_lng: coords?.lng || -68.3285,
                   };
+
                   let { data, error } = await supabase.from('prestadores').insert([payloadExt]).select().single();
                   if (error) {
                     const retry = await supabase.from('prestadores').insert([payloadBase]).select().single();
@@ -5372,6 +5775,7 @@ export default function App() {
           </div>
         </main>
       )}
+
       {/* ==================================================================== */}
       {/* MODAL DE EDICIÓN DE VEHÍCULO Y SUS 5 VENCIMIENTOS                    */}
       {/* ==================================================================== */}
@@ -5432,6 +5836,7 @@ export default function App() {
                     ))}
                   </select>
                 </div>
+
                 <div>
                   <label className="font-bold text-slate-600">1. Venc. Seguro</label>
                   <input
@@ -5494,6 +5899,7 @@ export default function App() {
           </div>
         </div>
       )}
+
       {/* ==================================================================== */}
       {/* MODAL DE EDICIÓN DE CHOFER Y LICENCIA                                */}
       {/* ==================================================================== */}
@@ -5597,6 +6003,7 @@ export default function App() {
           </div>
         </div>
       )}
+
       {/* ==================================================================== */}
       {/* MODAL DE EDICIÓN DE PRESTADOR Y DOMICILIO DE BASE OPERATIVA          */}
       {/* ==================================================================== */}
@@ -5708,6 +6115,7 @@ export default function App() {
           </div>
         </div>
       )}
+
       {/* ==================================================================== */}
       {/* MODAL DE EDICIÓN COMPLETA DE TRASLADO Y CONDICIONES                  */}
       {/* ==================================================================== */}
@@ -5731,6 +6139,7 @@ export default function App() {
                 <X className="w-5 h-5" />
               </button>
             </div>
+
             <form onSubmit={guardarEdicionTraslado} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                 <div>
@@ -5747,6 +6156,7 @@ export default function App() {
                     ))}
                   </select>
                 </div>
+
                 <div>
                   <label className="block font-semibold text-slate-600 mb-1">Estado del Traslado</label>
                   <select
@@ -5764,6 +6174,7 @@ export default function App() {
                     <option value="CANCELADO">CANCELADO</option>
                   </select>
                 </div>
+
                 <div>
                   <label className="block font-semibold text-slate-600 mb-1">Paciente</label>
                   <input
@@ -5818,6 +6229,7 @@ export default function App() {
                     className="w-full border rounded-xl px-3 py-2"
                   />
                 </div>
+
                 <div>
                   <label className="block font-semibold text-slate-600 mb-1">Domicilio Origen</label>
                   <input
@@ -5836,6 +6248,7 @@ export default function App() {
                     className="w-full border rounded-xl px-3 py-2"
                   />
                 </div>
+
                 <div>
                   <label className="block font-semibold text-slate-600 mb-1">Móvil Asignado</label>
                   <select
@@ -5857,6 +6270,7 @@ export default function App() {
                     ))}
                   </select>
                 </div>
+
                 <div>
                   <label className="block font-semibold text-slate-600 mb-1">Chofer Asignado (Independiente)</label>
                   <select
@@ -5871,6 +6285,7 @@ export default function App() {
                     ))}
                   </select>
                 </div>
+
                 <div className="sm:col-span-2">
                   <label className="block font-semibold text-slate-600 mb-1">Esquema de Liquidación ART</label>
                   <select
@@ -5885,8 +6300,10 @@ export default function App() {
                     ))}
                   </select>
                 </div>
+
                 <FormularioCondicionesTraslado state={trasladoEditando} onChange={setTrasladoEditando} />
               </div>
+
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
                 <button
                   type="button"
@@ -5906,6 +6323,7 @@ export default function App() {
           </div>
         </div>
       )}
+
       {/* ==================================================================== */}
       {/* VISTA 2: TERMINAL MÓVIL DEL CHOFER (ACCESO INDEPENDIENTE)            */}
       {/* ==================================================================== */}
@@ -5929,6 +6347,7 @@ export default function App() {
               </select>
             </div>
           )}
+
           {!viajeActivo ? (
             <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-sm text-slate-600">
               No hay traslados activos asignados en este momento.
@@ -5969,6 +6388,7 @@ export default function App() {
                   </button>
                 </div>
               </div>
+
               <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4 shadow-sm">
                 <div className="flex justify-between items-start">
                   <div>
@@ -5984,6 +6404,7 @@ export default function App() {
                     <Phone className="w-5 h-5" />
                   </a>
                 </div>
+
                 {/* ALERTA DE CONDICIONES ESPECIALES PARA EL CHOFER */}
                 <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
                   <div className="text-[11px] font-extrabold uppercase text-[#1E588D] flex items-center gap-1.5">
@@ -5992,12 +6413,14 @@ export default function App() {
                   </div>
                   <BadgesCondicionesTraslado traslado={viajeActivo} mostrarObservaciones={true} />
                 </div>
+
                 <div className="space-y-2 bg-slate-50 p-3.5 rounded-xl text-xs">
                   <div><strong>Base Operativa:</strong> {prestadorAsignado?.domicilio_base || 'Av. Moreno 37, San Rafael'}</div>
                   <div><strong>Retirar Paciente en:</strong> {viajeActivo.origen_direccion}</div>
                   <div><strong>Llevar a:</strong> {viajeActivo.destino_nombre}</div>
                   <div><strong>Modalidad:</strong> {viajeActivo.modalidad_viaje === 'IDA_VUELTA' ? 'Ida y Vuelta' : 'Solo Ida'}</div>
                 </div>
+
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => cambiarEstadoViaje(viajeActivo.id, 'EN_CAMINO_DOMICILIO')}
@@ -6018,6 +6441,7 @@ export default function App() {
                     3. Paciente a Bordo — Iniciar Traslado
                   </button>
                 </div>
+
                 <div className="pt-3 border-t border-slate-100">
                   <label className="block text-xs font-bold text-slate-700 mb-2">
                     Firma Digital del Paciente al Finalizar:
@@ -6030,6 +6454,7 @@ export default function App() {
                   />
                 </div>
               </div>
+
               <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
                 <h4 className="font-bold text-xs text-slate-700 uppercase">Chat Directo con el Paciente</h4>
                 <div className="max-h-40 overflow-y-auto space-y-2 bg-slate-50 p-3 rounded-xl">
@@ -6049,6 +6474,7 @@ export default function App() {
               </div>
             </>
           )}
+
           {modalDesperfecto && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
               <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4">
@@ -6073,6 +6499,7 @@ export default function App() {
           )}
         </main>
       )}
+
       {/* ==================================================================== */}
       {/* VISTA 3: PORTAL SEGURO DEL PACIENTE (ACCESO INDEPENDIENTE)           */}
       {/* ==================================================================== */}
@@ -6094,6 +6521,7 @@ export default function App() {
                   <p className="text-xs text-blue-100 mt-0.5">
                     Estado actual: <strong>{viajeActivo.estado.replace(/_/g, ' ')}</strong>
                   </p>
+
                   <div className="mt-4 bg-white/20 rounded-full h-3 overflow-hidden">
                     <div
                       className="bg-[#34B37B] h-full transition-all duration-700"
@@ -6106,6 +6534,7 @@ export default function App() {
                     <span>Clínica Destino</span>
                   </div>
                 </div>
+
                 <div className="p-4 pb-0">
                   <MapaSeguimientoGps
                     progreso={viajeActivo.gps_progreso || 15}
@@ -6118,6 +6547,7 @@ export default function App() {
                     coordsReales={viajeActivo.coords_reales}
                   />
                 </div>
+
                 <div className="p-5 space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -6141,6 +6571,7 @@ export default function App() {
                       <Phone className="w-5 h-5" />
                     </a>
                   </div>
+
                   <div className="bg-slate-50 p-3.5 rounded-xl text-xs space-y-2 text-slate-700">
                     <div><strong>Fecha y Hora:</strong> {viajeActivo.fecha_programada} • {viajeActivo.hora_programada || ''} hs</div>
                     <div><strong>Punto de retiro:</strong> {viajeActivo.origen_direccion}</div>
@@ -6152,6 +6583,7 @@ export default function App() {
                   </div>
                 </div>
               </div>
+
               <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
                 <h4 className="font-bold text-xs text-slate-700 uppercase">Chat con tu Chofer</h4>
                 <div className="max-h-40 overflow-y-auto space-y-2 bg-slate-50 p-3 rounded-xl">
@@ -6176,3 +6608,4 @@ export default function App() {
     </div>
   );
 }
+
