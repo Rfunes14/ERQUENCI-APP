@@ -3937,6 +3937,12 @@ export default function App() {
     );
   }
 
+  const trasladosLiquidacion = trasladosVisiblesPortal.filter((t) => {
+    if (filtroArtLiquidacion !== 'TODAS' && t.art_nombre !== filtroArtLiquidacion) return false;
+    if (filtroPrestadorLiquidacion !== 'TODOS' && t.prestador_id !== filtroPrestadorLiquidacion) return false;
+    return true;
+  });
+
   const totalFacturarFiltrado = +trasladosLiquidacion
     .reduce((acc, t) => acc + Number(t.importe_total || 0), 0)
     .toFixed(2);
