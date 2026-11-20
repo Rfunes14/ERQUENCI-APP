@@ -1438,6 +1438,16 @@ export default function App() {
       valor_tramo_2: 11260.08,
     },
   ]);
+  const [tarifasPorPrestador, setTarifasPorPrestador] = useState(() => {
+    try {
+      const saved = localStorage.getItem('erquenci_tarifas_prestador_v1');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return {};
+  });
+  const [prestadorTarifaEditandoId, setPrestadorTarifaEditandoId] = useState('22222222-2222-2222-2222-222222222221');
+  const [calificacionEstrellasTemp, setCalificacionEstrellasTemp] = useState(5);
+  const [calificacionResenaTemp, setCalificacionResenaTemp] = useState('');
   const [mostrarFormArt, setMostrarFormArt] = useState(false);
   const [artEditandoNombre, setArtEditandoNombre] = useState(null);
   const [formArt, setFormArt] = useState({
@@ -1732,18 +1742,43 @@ export default function App() {
   // ============================================================================
   // MOTOR DE LIQUIDACIÓN Y TARIFAS ART CON PRECISIÓN DECIMAL ($5.630,04 / $11.260,08 / $656,85)
   // ============================================================================
-  const obtenerTarifaArt = (artNombre) => {
+  const obtenerTarifaArt = (artNombre, prestadorId = null) => {
     const base = tarifasArt.find((t) => t.nombre_art === artNombre) || tarifasArt[0];
+    const pid = prestadorId || (portalActivo?.rol === 'PRESTADOR' ? portalActivo.prestador_id : null);
+    const keyPrest = pid && base?.nombre_art ? `${base.nombre_art}::${pid}` : null;
+    const override = keyPrest ? tarifasPorPrestador[keyPrest] : null;
+    const merged = override ? { ...base, ...override } : base;
     return {
-      valor_km: Number(base?.valor_km ?? 656.85),
-      bajada_bandera: Number(base?.bajada_bandera ?? 0),
-      valor_hora_espera: Number(base?.valor_hora_espera ?? 5630.04),
-      espera_desde_hora: Number(base?.espera_desde_hora ?? 1),
-      modo_facturacion_default: base?.modo_facturacion_default || 'URBANO_TRAMOS_Y_KM_CP',
-      regla_km: base?.regla_km || 'SOLO_IDA_PACIENTE',
-      valor_tramo_1: Number(base?.valor_tramo_1 ?? 5630.04),
-      valor_tramo_2: Number(base?.valor_tramo_2 ?? 11260.08),
+      valor_km: Number(merged?.valor_km ?? 656.85),
+      bajada_bandera: Number(merged?.bajada_bandera ?? 0),
+      valor_hora_espera: Number(merged?.valor_hora_espera ?? 5630.04),
+      espera_desde_hora: Number(merged?.espera_desde_hora ?? 1),
+      modo_facturacion_default: merged?.modo_facturacion_default || 'URBANO_TRAMOS_Y_KM_CP',
+      regla_km: merged?.regla_km || 'SOLO_IDA_PACIENTE',
+      valor_tramo_1: Number(merged?.valor_tramo_1 ?? 5630.04),
+      valor_tramo_2: Number(merged?.valor_tramo_2 ?? 11260.08),
     };
+  };
+
+  const actualizarTarifaPrestador = (artNombre, prestadorId, campo, valor) => {
+    if (!prestadorId) return;
+    const clave = `${artNombre}::${prestadorId}`;
+    setTarifasPorPrestador((prev) => {
+      const base = tarifasArt.find((t) => t.nombre_art === artNombre) || {};
+      const actual = prev[clave] || {
+        valor_km: base.valor_km ?? 656.85,
+        bajada_bandera: base.bajada_bandera ?? 0,
+        valor_hora_espera: base.valor_hora_espera ?? 5630.04,
+        espera_desde_hora: base.espera_desde_hora ?? 1,
+        modo_facturacion_default: base.modo_facturacion_default || 'URBANO_TRAMOS_Y_KM_CP',
+        regla_km: base.regla_km || 'SOLO_IDA_PACIENTE',
+        valor_tramo_1: base.valor_tramo_1 ?? 5630.04,
+        valor_tramo_2: base.valor_tramo_2 ?? 11260.08,
+      };
+      const next = { ...prev, [clave]: { ...actual, [campo]: valor } };
+      localStorage.setItem('erquenci_tarifas_prestador_v1', JSON.stringify(next));
+      return next;
+    });
   };
 
   const resolverEsquemaAutomatico = (artNombre, modalidadViaje, cpBase, cpOrigen, cpDestino) => {
@@ -2610,6 +2645,27 @@ export default function App() {
         guardandoEstadoRef.current = false;
       }
     }
+  };
+
+  const calificarTrasladoPaciente = async (viaje, estrellas, resena) => {
+    if (!viaje) return;
+    const meta = obtenerMetaTraslado(viaje);
+    const nuevoMeta = {
+      ...meta,
+      calificacion_estrellas: Number(estrellas),
+      calificacion_resena: (resena || '').trim(),
+      calificacion_fecha: new Date().toLocaleDateString('es-AR'),
+    };
+    const eventosActualizados = Array.isArray(viaje.eventos) && viaje.eventos.length > 0 ? [...viaje.eventos] : [{ hora: 'Fin', estado: viaje.estado, detalle: 'Viaje calificado' }];
+    eventosActualizados[0] = { ...eventosActualizados[0], meta_condiciones: nuevoMeta };
+
+    setTraslados((prev) => prev.map((t) => (t.id === viaje.id ? { ...t, eventos: eventosActualizados } : t)));
+    emitirCambioEnVivo(viaje.id, { eventos: eventosActualizados });
+    if (!String(viaje.id).startsWith('real-')) {
+      await supabase.from('traslados').update({ eventos: eventosActualizados }).eq('id', viaje.id);
+    }
+    setLinkCopiadoMsg('¡Gracias! Tu calificación fue enviada a la Central ART.');
+    setTimeout(() => setLinkCopiadoMsg(''), 3200);
   };
 
   // Recalcular liquidación en vivo con centavos exactos
@@ -4442,6 +4498,13 @@ export default function App() {
 
                           <div className="mb-3">
                             <BadgesCondicionesTraslado traslado={t} mostrarObservaciones={true} />
+                          {obtenerMetaTraslado(t).calificacion_estrellas && (
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-50 border border-amber-200 text-[11px] font-bold text-amber-800">
+                              <span>{'★'.repeat(obtenerMetaTraslado(t).calificacion_estrellas)}</span>
+                              <span>({obtenerMetaTraslado(t).calificacion_estrellas}/5)</span>
+                              {obtenerMetaTraslado(t).calificacion_resena && <span className="font-normal italic text-slate-600">"{obtenerMetaTraslado(t).calificacion_resena}"</span>}
+                            </div>
+                          )}
                           </div>
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-600 bg-slate-50 p-3 rounded-xl mb-3">
@@ -5107,57 +5170,81 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Selección Independiente de Vehículo y Chofer */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
-                    Asignar Vehículo Habilitado
-                  </label>
-                  <select
-                    value={nuevoViaje.vehiculo_id}
-                    onChange={(e) => {
-                      const v = vehiculos.find((item) => item.id === e.target.value);
-                      const chDefault = obtenerChoferDeVehiculo(v);
-                      setNuevoViaje({
-                        ...nuevoViaje,
-                        vehiculo_id: e.target.value,
-                        prestador_id: v?.prestador_id || nuevoViaje.prestador_id,
-                        chofer_id: chDefault?.id || nuevoViaje.chofer_id,
-                      });
-                    }}
-                    className="w-full border rounded-xl px-3 py-2 text-xs bg-white font-semibold"
-                  >
-                    {vehiculos.filter((v) => portalActivo?.rol !== 'PRESTADOR' || v.prestador_id === portalActivo.prestador_id).map((v) => {
-                      const bloqueado = vehiculoEstaBloqueado(v);
-                      return (
-                        <option key={v.id} value={v.id} disabled={bloqueado}>
-                          {bloqueado ? '⛔ BLOQUEADO — ' : '✅ '}
-                          {v.patente} | {v.modelo}
+                {/* Si es CENTRAL_ART, asigna únicamente al Prestador; si es Prestador/Admin, asigna Vehículo y Chofer */}
+                {portalActivo?.rol === 'CENTRAL_ART' ? (
+                  <div className="sm:col-span-2 p-3.5 rounded-xl bg-blue-50/70 border border-blue-200 space-y-2">
+                    <label className="block text-xs font-bold text-[#1E588D]">
+                      Prestador Designado para este Traslado (el Prestador asignará su Móvil y Chofer)
+                    </label>
+                    <select
+                      value={nuevoViaje.prestador_id}
+                      onChange={(e) => setNuevoViaje({ ...nuevoViaje, prestador_id: e.target.value })}
+                      className="w-full border border-blue-200 rounded-xl px-3 py-2 text-xs bg-white font-bold text-slate-800"
+                    >
+                      {prestadores.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.razon_social} • Zona: {p.zona_cobertura || 'San Rafael'} (Terminaciones: {(terminacionesPorPrestador[p.id] || []).join(', ') || 'Todas'})
                         </option>
-                      );
-                    })}
-                  </select>
-                </div>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-slate-600">
+                      El traslado se enviará en estado <strong>Pendiente OK Prestador</strong> para que la empresa designe vehículo y chofer.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">
+                        Asignar Vehículo Habilitado
+                      </label>
+                      <select
+                        value={nuevoViaje.vehiculo_id}
+                        onChange={(e) => {
+                          const v = vehiculos.find((item) => item.id === e.target.value);
+                          const chDefault = obtenerChoferDeVehiculo(v);
+                          setNuevoViaje({
+                            ...nuevoViaje,
+                            vehiculo_id: e.target.value,
+                            prestador_id: v?.prestador_id || nuevoViaje.prestador_id,
+                            chofer_id: chDefault?.id || nuevoViaje.chofer_id,
+                          });
+                        }}
+                        className="w-full border rounded-xl px-3 py-2 text-xs bg-white font-semibold"
+                      >
+                        {vehiculos.filter((v) => portalActivo?.rol !== 'PRESTADOR' || v.prestador_id === portalActivo.prestador_id).map((v) => {
+                          const bloqueado = vehiculoEstaBloqueado(v);
+                          return (
+                            <option key={v.id} value={v.id} disabled={bloqueado}>
+                              {bloqueado ? '⛔ BLOQUEADO — ' : '✅ '}
+                              {v.patente} | {v.modelo}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
-                    Elegir Chofer para este Viaje (Independiente del Auto)
-                  </label>
-                  <select
-                    value={nuevoViaje.chofer_id}
-                    onChange={(e) => setNuevoViaje({ ...nuevoViaje, chofer_id: e.target.value })}
-                    className="w-full border rounded-xl px-3 py-2 text-xs bg-white font-semibold"
-                  >
-                    {choferes.map((c) => {
-                      const evLic = evaluarVencimiento(c.licencia_venc);
-                      return (
-                        <option key={c.id} value={c.id} disabled={evLic.bloqueado}>
-                          {evLic.bloqueado ? '⛔ LIC. VENCIDA — ' : '👨‍✈️ '}
-                          {c.nombre} (Lic: {c.licencia_venc})
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">
+                        Elegir Chofer para este Viaje (Independiente del Auto)
+                      </label>
+                      <select
+                        value={nuevoViaje.chofer_id}
+                        onChange={(e) => setNuevoViaje({ ...nuevoViaje, chofer_id: e.target.value })}
+                        className="w-full border rounded-xl px-3 py-2 text-xs bg-white font-semibold"
+                      >
+                        {choferes.filter((c) => portalActivo?.rol !== 'PRESTADOR' || c.prestador_id === portalActivo.prestador_id).map((c) => {
+                          const evLic = evaluarVencimiento(c.licencia_venc);
+                          return (
+                            <option key={c.id} value={c.id} disabled={evLic.bloqueado}>
+                              {evLic.bloqueado ? '⛔ LIC. VENCIDA — ' : '👨‍✈️ '}
+                              {c.nombre} (Lic: {c.licencia_venc})
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                  </>
+                )}
 
                 {/* Programación Recurrente (Sesiones FKT / Rehabilitación, ej. 5 días MULETAS) */}
                 <div className="sm:col-span-2 p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
@@ -5368,6 +5455,25 @@ export default function App() {
                     <p className="text-xs text-slate-500">
                       Valores convenidos activos: Radio Céntrico Ida (Tramo 1) <strong>$5.630,04</strong> • Ida y Vuelta (Tramo 1 + Tramo 2) <strong>$11.260,08</strong> • Hora de Espera <strong>$5.630,04</strong> • Kilómetro Solo de Ida <strong>$656,85</strong>.
                     </p>
+                    {(portalActivo?.rol === 'CENTRAL_ART' || portalActivo?.rol === 'SUPER_ADMIN') ? (
+                      <div className="mt-2 flex flex-wrap items-center gap-2 bg-blue-50/80 border border-blue-200 rounded-xl p-2.5">
+                        <span className="text-[11px] font-bold text-[#1E588D]">🤝 Acuerdo de Valores con Prestador Vigente:</span>
+                        <select
+                          value={prestadorTarifaEditandoId}
+                          onChange={(e) => setPrestadorTarifaEditandoId(e.target.value)}
+                          className="border border-blue-200 bg-white rounded-lg px-2.5 py-1 text-xs font-bold text-slate-800"
+                        >
+                          {prestadores.map((p) => (
+                            <option key={p.id} value={p.id}>{p.razon_social}</option>
+                          ))}
+                        </select>
+                        <span className="text-[10px] text-slate-500">Los valores que edites aquí se reflejan en el Portal de este Prestador.</span>
+                      </div>
+                    ) : (
+                      <div className="mt-2 text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-1.5 inline-block">
+                        🤝 Valores vigentes acordados con la ART para tu empresa ({portalActivo?.nombre})
+                      </div>
+                    )}
                   </div>
                   {portalActivo?.rol !== 'PRESTADOR' && (
                     <button
@@ -5509,7 +5615,14 @@ export default function App() {
                 )}
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {tarifasArt.map((tar) => (
+                  {tarifasArt.map((tar) => {
+                    const pidTarifa = portalActivo?.rol === 'PRESTADOR' ? portalActivo.prestador_id : prestadorTarifaEditandoId;
+                    const tarEf = obtenerTarifaArt(tar.nombre_art, pidTarifa);
+                    const guardarCampoTarifa = (campo, val) => {
+                      if (pidTarifa) actualizarTarifaPrestador(tar.nombre_art, pidTarifa, campo, val);
+                      if (portalActivo?.rol !== 'PRESTADOR') actualizarCampoTarifaArt(tar.nombre_art, campo, val);
+                    };
+                    return (
                     <div key={tar.nombre_art} className="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-3 text-xs">
                       <div className="flex items-center justify-between border-b border-slate-200 pb-2 gap-2">
                         <div className="flex items-center gap-2 min-w-0">
@@ -5546,9 +5659,9 @@ export default function App() {
                             Criterio Principal de Facturación
                           </label>
                           <select
-                            value={tar.modo_facturacion_default || 'URBANO_TRAMOS_Y_KM_CP'}
+                            value={tarEf.modo_facturacion_default}
                             onChange={(e) =>
-                              actualizarCampoTarifaArt(tar.nombre_art, 'modo_facturacion_default', e.target.value)
+                              guardarCampoTarifa('modo_facturacion_default', e.target.value)
                             }
                             className="w-full border bg-white rounded-lg px-2.5 py-1.5 font-semibold text-slate-800"
                           >
@@ -5567,9 +5680,9 @@ export default function App() {
                           <input
                             type="number"
                             step="0.01"
-                            value={tar.valor_tramo_1 ?? 5630.04}
+                            value={tarEf.valor_tramo_1}
                             onChange={(e) =>
-                              actualizarCampoTarifaArt(tar.nombre_art, 'valor_tramo_1', Number(e.target.value))
+                              guardarCampoTarifa('valor_tramo_1', Number(e.target.value))
                             }
                             className="w-full border bg-white rounded-lg px-2.5 py-1.5 font-bold text-teal-900"
                           />
@@ -5581,9 +5694,9 @@ export default function App() {
                           <input
                             type="number"
                             step="0.01"
-                            value={tar.valor_tramo_2 ?? 11260.08}
+                            value={tarEf.valor_tramo_2}
                             onChange={(e) =>
-                              actualizarCampoTarifaArt(tar.nombre_art, 'valor_tramo_2', Number(e.target.value))
+                              guardarCampoTarifa('valor_tramo_2', Number(e.target.value))
                             }
                             className="w-full border bg-white rounded-lg px-2.5 py-1.5 font-bold text-teal-900"
                           />
@@ -5596,9 +5709,9 @@ export default function App() {
                           <input
                             type="number"
                             step="0.01"
-                            value={tar.valor_km}
+                            value={tarEf.valor_km}
                             onChange={(e) =>
-                              actualizarCampoTarifaArt(tar.nombre_art, 'valor_km', Number(e.target.value))
+                              guardarCampoTarifa('valor_km', Number(e.target.value))
                             }
                             className="w-full border bg-white rounded-lg px-2.5 py-1.5 font-bold text-[#1E588D]"
                           />
@@ -5609,8 +5722,8 @@ export default function App() {
                             Modalidad de Conteo de KM
                           </label>
                           <select
-                            value={tar.regla_km || 'SOLO_IDA_PACIENTE'}
-                            onChange={(e) => actualizarCampoTarifaArt(tar.nombre_art, 'regla_km', e.target.value)}
+                            value={tarEf.regla_km}
+                            onChange={(e) => guardarCampoTarifa('regla_km', e.target.value)}
                             className="w-full border bg-white rounded-lg px-2 py-1.5 font-semibold"
                           >
                             {Object.entries(REGLAS_KM_ART_LABELS).map(([k, label]) => (
@@ -5628,9 +5741,9 @@ export default function App() {
                           <input
                             type="number"
                             step="0.01"
-                            value={tar.valor_hora_espera}
+                            value={tarEf.valor_hora_espera}
                             onChange={(e) =>
-                              actualizarCampoTarifaArt(tar.nombre_art, 'valor_hora_espera', Number(e.target.value))
+                              guardarCampoTarifa('valor_hora_espera', Number(e.target.value))
                             }
                             className="w-full border bg-white rounded-lg px-2.5 py-1.5 font-bold"
                           />
@@ -5641,9 +5754,9 @@ export default function App() {
                             Espera: ¿A partir de cuántas hs suma?
                           </label>
                           <select
-                            value={Number(tar.espera_desde_hora ?? 1)}
+                            value={Number(tarEf.espera_desde_hora)}
                             onChange={(e) =>
-                              actualizarCampoTarifaArt(tar.nombre_art, 'espera_desde_hora', Number(e.target.value))
+                              guardarCampoTarifa('espera_desde_hora', Number(e.target.value))
                             }
                             className="w-full border bg-white rounded-lg px-2 py-1.5 font-bold text-amber-900"
                           >
@@ -5655,7 +5768,8 @@ export default function App() {
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -6072,9 +6186,31 @@ export default function App() {
                       />
                     </div>
                   </div>
-                  <button type="submit" className="px-4 py-2 bg-[#1E588D] text-white font-bold rounded-xl text-xs">
-                    Guardar Vehículo en Flota
-                  </button>
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                    <div className="flex items-center gap-3">
+                      {nuevoVehiculo.foto_url && (
+                        <img src={nuevoVehiculo.foto_url} alt="Auto" className="w-12 h-9 rounded-lg object-cover border border-slate-200" />
+                      )}
+                      <label className="cursor-pointer px-3 py-2 rounded-xl bg-slate-100 hover:bg-blue-50 text-[#1E588D] font-bold text-[11px] flex items-center gap-1.5 border border-slate-200">
+                        <Camera className="w-3.5 h-3.5" /> {nuevoVehiculo.foto_url ? 'Cambiar Foto Auto' : 'Subir Foto del Auto'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (!f) return;
+                            leerArchivoBase64(f, (b64) =>
+                              setNuevoVehiculo((prev) => ({ ...prev, foto_url: b64 }))
+                            );
+                          }}
+                        />
+                      </label>
+                    </div>
+                    <button type="submit" className="px-4 py-2 bg-[#1E588D] text-white font-bold rounded-xl text-xs">
+                      Guardar Vehículo en Flota
+                    </button>
+                  </div>
                 </form>
               </div>
 
@@ -6091,7 +6227,7 @@ export default function App() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {choferes.map((c) => {
+                  {choferes.filter((c) => portalActivo?.rol !== 'PRESTADOR' || c.prestador_id === portalActivo.prestador_id).map((c) => {
                     const prest = prestadores.find((p) => p.id === c.prestador_id);
                     const autoHab = vehiculos.find((v) => v.id === c.vehiculo_habitual_id || v.chofer_id === c.id);
                     const evLic = evaluarVencimiento(c.licencia_venc);
@@ -6366,19 +6502,26 @@ export default function App() {
                               vehiculos
                                 .filter((v) => v.prestador_id === p.id)
                                 .map((v) => (
-                                  <div key={v.id} className="p-2 bg-white rounded-lg border border-slate-200 mb-1.5">
-                                    <div className="font-bold text-slate-900 flex justify-between">
-                                      <span>{v.patente} — {v.modelo}</span>
-                                      <span className={vehiculoEstaBloqueado(v) ? 'text-rose-600' : 'text-emerald-700'}>
-                                        {vehiculoEstaBloqueado(v) ? 'BLOQUEADO' : 'APTO'}
-                                      </span>
-                                    </div>
+                                  <div key={v.id} className="p-2 bg-white rounded-lg border border-slate-200 mb-1.5 flex items-center gap-2.5">
+                                    <img
+                                      src={v.foto_url || 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?w=180&h=120&fit=crop'}
+                                      alt={v.patente}
+                                      className="w-14 h-11 rounded-lg object-cover border border-slate-200 shrink-0"
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-bold text-slate-900 flex justify-between">
+                                        <span className="truncate">{v.patente} — {v.modelo}</span>
+                                        <span className={vehiculoEstaBloqueado(v) ? 'text-rose-600' : 'text-emerald-700'}>
+                                          {vehiculoEstaBloqueado(v) ? 'BLOQUEADO' : 'APTO'}
+                                        </span>
+                                      </div>
                                     <div className="flex flex-wrap gap-1 mt-1">
                                       {normalizarDocsVehiculo(v.docs).map((d) => (
                                         <span key={d.tipo} className="px-1.5 py-0.5 rounded bg-slate-100 text-[10px] text-slate-600">
                                           {d.tipo.slice(0, 4)}: {d.vencimiento}
                                         </span>
                                       ))}
+                                      </div>
                                     </div>
                                   </div>
                                 ))
@@ -6392,9 +6535,16 @@ export default function App() {
                               choferes
                                 .filter((c) => c.prestador_id === p.id)
                                 .map((c) => (
-                                  <div key={c.id} className="flex justify-between p-1.5 bg-white rounded-lg border border-slate-200 mb-1">
-                                    <span className="font-semibold text-slate-800">{c.nombre} (DNI {c.dni})</span>
-                                    <span className="text-[10px] text-slate-500">Lic: {c.licencia_venc}</span>
+                                  <div key={c.id} className="flex items-center justify-between gap-2 p-1.5 bg-white rounded-lg border border-slate-200 mb-1">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <img
+                                        src={c.foto_url || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face'}
+                                        alt={c.nombre}
+                                        className="w-8 h-8 rounded-full object-cover border border-emerald-400 shrink-0"
+                                      />
+                                      <span className="font-semibold text-slate-800 truncate">{c.nombre} (DNI {c.dni})</span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-500 shrink-0">Lic: {c.licencia_venc}</span>
                                   </div>
                                 ))
                             )}
@@ -7344,6 +7494,58 @@ export default function App() {
                     <Send className="w-4 h-4" />
                   </button>
                 </form>
+              </div>
+
+              {/* CALIFICACIÓN CON ESTRELLAS Y RESEÑA DEL VIAJE */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-xs text-slate-800 uppercase">Calificá tu Traslado</h4>
+                  <span className="text-[11px] font-bold text-amber-600">★ 1 a 5 Estrellas</span>
+                </div>
+                {obtenerMetaTraslado(viajeActivo).calificacion_estrellas ? (
+                  <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 space-y-1 text-xs">
+                    <div className="font-extrabold text-amber-700 text-sm">
+                      {'★'.repeat(obtenerMetaTraslado(viajeActivo).calificacion_estrellas)}
+                      {'☆'.repeat(5 - obtenerMetaTraslado(viajeActivo).calificacion_estrellas)} ({obtenerMetaTraslado(viajeActivo).calificacion_estrellas}/5)
+                    </div>
+                    {obtenerMetaTraslado(viajeActivo).calificacion_resena && (
+                      <p className="text-slate-700 italic">"{obtenerMetaTraslado(viajeActivo).calificacion_resena}"</p>
+                    )}
+                    <div className="text-[10px] text-emerald-700 font-bold">✓ Calificación registrada</div>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    <div className="flex items-center gap-2">
+                      {[1, 2, 3, 4, 5].map((num) => (
+                        <button
+                          key={num}
+                          type="button"
+                          onClick={() => setCalificacionEstrellasTemp(num)}
+                          className={`text-2xl transition-transform hover:scale-125 cursor-pointer ${
+                            num <= calificacionEstrellasTemp ? 'text-amber-400' : 'text-slate-300'
+                          }`}
+                        >
+                          ★
+                        </button>
+                      ))}
+                      <span className="text-xs font-bold text-slate-600 ml-1">{calificacionEstrellasTemp}/5</span>
+                    </div>
+                    <textarea
+                      rows={2}
+                      value={calificacionResenaTemp}
+                      onChange={(e) => setCalificacionResenaTemp(e.target.value)}
+                      placeholder="Contanos cómo fue la puntualidad, el trato del chofer y el estado del vehículo..."
+                      className="w-full border border-slate-200 rounded-xl p-2.5 text-xs bg-slate-50 focus:bg-white outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => calificarTrasladoPaciente(viajeActivo, calificacionEstrellasTemp, calificacionResenaTemp)}
+                      className="w-full py-2.5 rounded-xl bg-gradient-to-r from-[#34B37B] to-[#1E588D] text-white font-bold text-xs shadow-sm"
+                    >
+                      Enviar Calificación y Reseña
+                    </button>
+                  </div>
+                )}
               </div>
             </>
           )}
